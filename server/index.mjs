@@ -1,9 +1,14 @@
 import 'dotenv/config'
 import express from 'express'
 import OpenAI from 'openai'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const app = express()
 const port = Number(process.env.PORT ?? 8787)
+const host = process.env.HOST ?? (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1')
+const serverDirectory = path.dirname(fileURLToPath(import.meta.url))
+const distDirectory = path.resolve(serverDirectory, '../dist')
 
 app.use(express.json({ limit: '16kb' }))
 
@@ -231,6 +236,12 @@ app.post('/api/smile-matches', (request, response) => {
   })
 })
 
-app.listen(port, '127.0.0.1', () => {
-  console.log(`JOY:D capsule server listening on http://127.0.0.1:${port}`)
+app.use(express.static(distDirectory))
+
+app.get('/{*path}', (_request, response) => {
+  response.sendFile(path.join(distDirectory, 'index.html'))
+})
+
+app.listen(port, host, () => {
+  console.log(`JOY:D server listening on http://${host}:${port}`)
 })

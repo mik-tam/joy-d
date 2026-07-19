@@ -318,7 +318,7 @@ function PreviewState({
       </h1>
       <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
         {smileUnlocked
-          ? 'Your first JOY:D signal is glowing. The next build step will turn it into a world.'
+          ? 'Your first JOY:D signal is glowing. Step through when you’re ready.'
           : statusCopy}
       </p>
       {smileStatus !== 'unavailable' && !smileUnlocked && (

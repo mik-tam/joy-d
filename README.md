@@ -95,6 +95,19 @@ npm run dev
 
 Open the local address shown in the terminal. `npm run dev` starts both the Vite app and the local API server.
 
+## Deploy
+
+Build the client, then run the same Express server in production:
+
+```bash
+npm run build
+npm start
+```
+
+The server serves `dist` and the `/api` endpoints from one process. Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in your host's encrypted environment settings—never expose either key in a Vite `VITE_*` variable. Hosts normally provide `PORT`; `npm start` binds to the host's network interface, while `npm run dev` stays loopback-only. Deploy over HTTPS: browsers require a secure context for camera access outside `localhost`.
+
+The matching pool remains in process memory only: it is ephemeral, capped, and cleared on restart. No camera frames, face landmarks, or raw smile measurements are sent to the server in any deployment.
+
 ### Quick test
 
 1. Allow the browser camera permission.
