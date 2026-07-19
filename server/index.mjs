@@ -3,6 +3,7 @@ import express from 'express'
 import OpenAI from 'openai'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseCapsuleOutput } from './capsuleParser.mjs'
 
 const app = express()
 const port = Number(process.env.PORT ?? 8787)
@@ -73,15 +74,6 @@ function isCapsule(value) {
   return value && typeof value === 'object' && fields.every(
     (field) => typeof value[field] === 'string' && value[field].trim().length > 0 && value[field].length <= 420,
   )
-}
-
-function parseCapsuleOutput(outputText) {
-  if (typeof outputText !== 'string') {
-    throw new SyntaxError('AI returned no text')
-  }
-
-  const fencedJson = outputText.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  return JSON.parse((fencedJson?.[1] ?? outputText).trim())
 }
 
 const capsuleSchema = {
@@ -166,7 +158,12 @@ app.post('/api/joy-capsules', async (request, response) => {
     const outputText = useOpenRouter
       ? completion.choices[0]?.message.content
       : completion.output_text
-    const capsule = parseCapsuleOutput(outputText)
+    let capsule
+    try {
+      capsule = parseCapsuleOutput(outputText)
+    } catch {
+      return response.status(502).json({ code: 'INVALID_CAPSULE' })
+    }
     if (!isCapsule(capsule)) {
       return response.status(502).json({ code: 'INVALID_CAPSULE' })
     }
