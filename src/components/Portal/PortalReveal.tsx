@@ -8,7 +8,8 @@ import {
   type JoyCapsule,
 } from '../../data/joyCapsule'
 import { findSmileMatch, SmileMatchError, type SmileMatch } from '../../data/smileMatch'
-import { playConnectionChime, playDiscoveryChime, playPortalChime, setJoySoundsEnabled, stopJoySounds } from '../../data/joySounds'
+import { playConnectionChime, playDiscoveryChime, playHiddenWonderSound, setJoySoundsEnabled, startWorldSoundscape, stopJoySounds, stopWorldSoundscape } from '../../data/joySounds'
+import { WorldSecret, WorldStage } from './WorldStage'
 
 type PortalRevealProps = {
   onClose: () => void
@@ -36,9 +37,11 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
   const [storyOpen, setStoryOpen] = useState(false)
   const [chimesOn, setChimesOn] = useState(false)
   const [isReading, setIsReading] = useState(false)
+  const [revealedWorlds, setRevealedWorlds] = useState<Set<string>>(() => new Set())
   const initialRequestStarted = useRef(false)
   const travel = reduceMotion ? 24 : 1300
   const duration = reduceMotion ? 0.2 : 0.95
+  const activeCapsule = capsules[activeCapsuleIndex] ?? null
 
   const setErrorStatus = useCallback((error: unknown) => {
     if (error instanceof JoyCapsuleError && error.code === 'AI_NOT_CONFIGURED') {
@@ -103,11 +106,16 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
     window.speechSynthesis?.cancel()
   }, [])
 
+  useEffect(() => {
+    if (chimesOn && activeCapsule) startWorldSoundscape(activeCapsule.soundMood)
+  }, [activeCapsule, chimesOn])
+
   const toggleChimes = () => {
     const nextValue = !chimesOn
     setChimesOn(nextValue)
     setJoySoundsEnabled(nextValue)
-    if (nextValue) playPortalChime()
+    if (nextValue && activeCapsule) startWorldSoundscape(activeCapsule.soundMood)
+    if (!nextValue) stopWorldSoundscape()
   }
 
   const stopReading = () => {
@@ -127,7 +135,11 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
     window.speechSynthesis.speak(utterance)
   }
 
-  const activeCapsule = capsules[activeCapsuleIndex] ?? null
+  const revealHiddenWonder = () => {
+    if (!activeCapsule || revealedWorlds.has(activeCapsule.worldName)) return
+    setRevealedWorlds((current) => new Set([...current, activeCapsule.worldName]))
+    playHiddenWonderSound()
+  }
 
   return (
     <motion.div
@@ -141,6 +153,20 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,197,132,0.32),transparent_18%),radial-gradient(circle_at_26%_70%,rgba(185,162,255,0.24),transparent_34%),radial-gradient(circle_at_77%_24%,rgba(130,233,210,0.18),transparent_30%)]" />
       <div className="joy-paper-grain absolute inset-0" aria-hidden="true" />
+      <AnimatePresence mode="wait">
+        {activeCapsule && (
+          <WorldStage
+            capsule={activeCapsule}
+          />
+        )}
+      </AnimatePresence>
+      {activeCapsule && (
+        <WorldSecret
+          capsule={activeCapsule}
+          hiddenRevealed={revealedWorlds.has(activeCapsule.worldName)}
+          onRevealHidden={revealHiddenWonder}
+        />
+      )}
       <button
         type="button"
         onClick={toggleChimes}
@@ -148,7 +174,7 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
         className="absolute right-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
       >
         {chimesOn ? <Volume2 className="size-4" aria-hidden="true" /> : <VolumeX className="size-4" aria-hidden="true" />}
-        Gentle chimes: {chimesOn ? 'On' : 'Off'}
+        World sound: {chimesOn ? 'On' : 'Off'}
       </button>
 
       <motion.div
@@ -236,6 +262,7 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
           onOpenStory={() => setStoryOpen(true)}
           onReadAloud={() => activeCapsule && readCapsuleAloud(activeCapsule)}
           isReading={isReading}
+          hiddenRevealed={activeCapsule ? revealedWorlds.has(activeCapsule.worldName) : false}
         />
         <button
           type="button"
@@ -273,6 +300,7 @@ function JoyCapsuleMoment({
   onOpenStory,
   onReadAloud,
   isReading,
+  hiddenRevealed,
 }: {
   capsule: JoyCapsule | null
   status: CapsuleStatus
@@ -287,6 +315,7 @@ function JoyCapsuleMoment({
   onOpenStory: () => void
   onReadAloud: () => void
   isReading: boolean
+  hiddenRevealed: boolean
 }) {
   if (status === 'loading') {
     return (
@@ -391,7 +420,10 @@ function JoyCapsuleMoment({
       <div className="mt-4 grid gap-2 border-t border-white/10 pt-4 text-xs text-white/65">
         <p><span className="font-bold text-amber-100/80">LOOK:</span> {capsule.visualDirection}</p>
         <p><span className="font-bold text-amber-100/80">SOUND:</span> {capsule.soundMood}</p>
-        <p><span className="font-bold text-amber-100/80">HIDDEN THING:</span> {capsule.surprise}</p>
+        <p>
+          <span className="font-bold text-amber-100/80">HIDDEN THING:</span>{' '}
+          {hiddenRevealed ? capsule.surprise : 'A sparkling secret has slipped into the world. Find it in the scene.'}
+        </p>
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
         <div className="flex items-center gap-1">

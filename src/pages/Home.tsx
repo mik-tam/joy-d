@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { ArrowUpRight, Sparkles, WandSparkles } from 'lucide-react'
 import { useState } from 'react'
 import { SmileCamera } from '../components/SmileCamera/SmileCamera'
@@ -15,6 +15,7 @@ export function Home() {
       <div className="absolute inset-0 -z-30 bg-[url('/art/lantern-sea-hero.png')] bg-cover bg-center" />
       <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(30,16,58,0.9)_0%,rgba(38,20,64,0.62)_43%,rgba(26,13,49,0.12)_100%)]" />
       <div className="joy-paper-grain absolute inset-0 -z-10" aria-hidden="true" />
+      <WanderingWorld />
       <div className="joy-spark joy-spark-one absolute left-[12%] top-[15%]" aria-hidden="true">✦</div>
       <div className="joy-spark joy-spark-two absolute left-[39%] top-[28%]" aria-hidden="true">✧</div>
       <div className="joy-spark joy-spark-three absolute bottom-[22%] left-[27%]" aria-hidden="true">✦</div>
@@ -81,5 +82,37 @@ export function Home() {
         </motion.p>
       </section>
     </main>
+  )
+}
+
+function WanderingWorld() {
+  const reduceMotion = useReducedMotion()
+  const wanderers = [
+    { glyph: '☾', left: '73%', top: '12%', size: 'text-7xl', delay: 0, drift: 34 },
+    { glyph: '❋', left: '82%', top: '67%', size: 'text-5xl', delay: -2.2, drift: -26 },
+    { glyph: '〰', left: '57%', top: '77%', size: 'text-6xl', delay: -4.8, drift: 38 },
+    { glyph: '✧', left: '91%', top: '35%', size: 'text-4xl', delay: -1, drift: -22 },
+    { glyph: '◒', left: '68%', top: '54%', size: 'text-5xl', delay: -5.7, drift: 24 },
+  ]
+
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      {wanderers.map((wanderer) => (
+        <motion.span
+          key={wanderer.left}
+          animate={reduceMotion ? { opacity: 0.48 } : { x: [0, wanderer.drift, -wanderer.drift * 0.35, 0], y: [0, -25, 18, 0], rotate: [0, 10, -7, 0], opacity: [0.28, 0.8, 0.4, 0.28] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: wanderer.delay }}
+          className={`absolute ${wanderer.size} text-amber-100/70 drop-shadow-[0_0_18px_rgba(255,218,132,0.45)]`}
+          style={{ left: wanderer.left, top: wanderer.top }}
+        >
+          {wanderer.glyph}
+        </motion.span>
+      ))}
+      <motion.div
+        animate={reduceMotion ? undefined : { x: ['-15%', '115%'] }}
+        transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+        className="absolute bottom-[16%] h-8 w-40 rounded-[50%] border border-amber-100/25 bg-amber-100/10 blur-[1px]"
+      />
+    </div>
   )
 }
