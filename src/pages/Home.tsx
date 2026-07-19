@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Sparkles } from 'lucide-react'
+import { ArrowUpRight, Sparkles, WandSparkles } from 'lucide-react'
 import { useState } from 'react'
 import { SmileCamera } from '../components/SmileCamera/SmileCamera'
 
@@ -11,8 +11,13 @@ export function Home() {
   }
 
   return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#1b1033] px-6 py-12">
-      <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_18%_18%,rgba(253,179,255,0.27),transparent_30%),radial-gradient(circle_at_80%_22%,rgba(255,191,117,0.25),transparent_25%),radial-gradient(circle_at_50%_90%,rgba(119,220,205,0.24),transparent_30%)]" />
+    <main className="joy-landing relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#281941] px-6 py-12">
+      <div className="absolute inset-0 -z-30 bg-[url('/art/lantern-sea-hero.png')] bg-cover bg-center" />
+      <div className="absolute inset-0 -z-20 bg-[linear-gradient(90deg,rgba(30,16,58,0.9)_0%,rgba(38,20,64,0.62)_43%,rgba(26,13,49,0.12)_100%)]" />
+      <div className="joy-paper-grain absolute inset-0 -z-10" aria-hidden="true" />
+      <div className="joy-spark joy-spark-one absolute left-[12%] top-[15%]" aria-hidden="true">✦</div>
+      <div className="joy-spark joy-spark-two absolute left-[39%] top-[28%]" aria-hidden="true">✧</div>
+      <div className="joy-spark joy-spark-three absolute bottom-[22%] left-[27%]" aria-hidden="true">✦</div>
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 55, repeat: Infinity, ease: 'linear' }}
@@ -24,12 +29,12 @@ export function Home() {
         className="absolute -bottom-32 -left-28 -z-10 size-[30rem] rounded-full border border-amber-100/20"
       />
 
-      <section className="w-full max-w-2xl text-center">
+      <section className="w-full max-w-5xl text-center sm:text-left">
         <motion.p
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="mb-8 flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.32em] text-amber-100/80"
+          className="mb-7 flex items-center justify-center gap-2 text-xs font-bold tracking-[0.32em] text-amber-100/90 sm:justify-start"
         >
           <Sparkles className="size-4" aria-hidden="true" />
           A TINY PORTAL TO DELIGHT
@@ -39,27 +44,29 @@ export function Home() {
           initial={{ opacity: 0, scale: 0.92, y: 18 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: 'easeOut' }}
-          className="rounded-[2.5rem] border border-white/20 bg-white/10 p-8 shadow-2xl shadow-purple-950/45 backdrop-blur-xl sm:p-14"
+          className="joy-paper-card max-w-2xl rounded-[2.5rem] border border-[#ffe7a3]/40 bg-[#2c1b50]/68 p-8 shadow-[0_24px_80px_rgba(20,8,42,0.38)] backdrop-blur-xl sm:p-14"
         >
-          <div className="mx-auto mb-8 flex size-24 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-400 text-5xl shadow-lg shadow-rose-950/30">
+          <div className="mx-auto mb-8 flex size-24 items-center justify-center rounded-[2rem] border-2 border-[#3b225b]/30 bg-gradient-to-br from-amber-100 via-rose-300 to-fuchsia-400 text-5xl shadow-[inset_0_2px_0_rgba(255,255,255,0.65),0_12px_28px_rgba(22,8,42,0.36)] sm:mx-0">
             :D
           </div>
+          <p className="mb-3 font-serif text-lg italic tracking-wide text-amber-100/90">A small voyage for the feeling that just arrived.</p>
           <h1 className="font-serif text-6xl font-black tracking-[-0.08em] text-white sm:text-8xl">
             JOY<span className="text-amber-200">:</span>D
           </h1>
-          <p className="mx-auto mt-7 max-w-md text-2xl font-medium leading-snug text-white/95 sm:text-3xl">
+          <p className="mx-auto mt-7 max-w-md text-2xl font-medium leading-snug text-white/95 sm:mx-0 sm:text-3xl">
             Every smile opens a new world.
           </p>
-          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-white/70">
-            A whimsical little adventure is waiting on the other side of your smile.
+          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-white/80 sm:mx-0">
+            Somewhere beyond the tide, a lantern boat is waiting to carry one bright little moment into an impossible place.
           </p>
 
           <button
             type="button"
             onClick={() => setScreen('camera')}
-            className="group mt-10 inline-flex items-center gap-3 rounded-full bg-amber-100 px-6 py-3.5 font-bold text-purple-950 shadow-lg shadow-amber-950/20 transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
+            className="group mt-10 inline-flex items-center gap-3 rounded-full border border-white/50 bg-[#ffe8a8] px-6 py-3.5 font-bold text-purple-950 shadow-[0_10px_0_#b56a7a,0_17px_30px_rgba(20,8,42,0.38)] transition hover:-translate-y-1 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
           >
-            Begin adventure
+            <WandSparkles className="size-5" aria-hidden="true" />
+            Open the little door
             <ArrowUpRight className="size-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
           </button>
         </motion.div>
@@ -68,9 +75,9 @@ export function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.75 }}
-          className="mt-8 text-sm text-white/55"
+          className="mt-7 max-w-md text-sm leading-relaxed text-white/70 sm:mx-0"
         >
-          Your smile is the key. The rest is a surprise.
+          Your smile is the key. Camera and face signals stay in your browser; only a playful, non-scientific creative signature begins the story.
         </motion.p>
       </section>
     </main>

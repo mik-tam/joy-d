@@ -129,7 +129,9 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
 
   return (
     <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#1b1033] px-6 py-12">
-      <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_12%_22%,rgba(253,179,255,0.25),transparent_28%),radial-gradient(circle_at_84%_12%,rgba(255,191,117,0.22),transparent_30%),radial-gradient(circle_at_55%_95%,rgba(119,220,205,0.22),transparent_32%)]" />
+      <div className="absolute inset-0 -z-30 bg-[url('/art/lantern-sea-hero.png')] bg-cover bg-[72%_center] opacity-45" />
+      <div className="absolute inset-0 -z-20 bg-[linear-gradient(145deg,rgba(29,15,57,0.93),rgba(54,29,86,0.8),rgba(20,55,80,0.86))]" />
+      <div className="joy-paper-grain absolute inset-0 -z-10" aria-hidden="true" />
       <motion.div
         animate={{ rotate: 360 }}
         transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
@@ -150,7 +152,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: 'easeOut' }}
-          className="rounded-[2.5rem] border border-white/20 bg-white/10 p-7 text-center shadow-2xl shadow-purple-950/45 backdrop-blur-xl sm:p-10"
+          className="joy-paper-card rounded-[2.5rem] border border-[#ffe7a3]/30 bg-[#241442]/70 p-7 text-center shadow-2xl shadow-purple-950/45 backdrop-blur-xl sm:p-10"
         >
           <p className="flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.28em] text-amber-100/80">
             <Sparkles className="size-4" aria-hidden="true" />
@@ -189,8 +191,9 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
 
 function CameraFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="relative mx-auto mt-7 aspect-square w-full max-w-[21rem] overflow-hidden rounded-[2rem] border border-white/20 bg-purple-950/45 shadow-inner shadow-purple-950/50">
-      <div className="absolute inset-3 rounded-[1.55rem] border border-amber-100/30" />
+    <div className="relative mx-auto mt-7 aspect-square w-full max-w-[21rem] overflow-hidden rounded-[2rem] border border-[#ffe7a3]/35 bg-purple-950/45 shadow-[inset_0_0_0_5px_rgba(255,255,255,0.04),0_15px_35px_rgba(17,7,39,0.35)]">
+      <div className="absolute inset-3 rounded-[1.55rem] border border-amber-100/35" />
+      <div className="pointer-events-none absolute -right-5 -top-6 text-4xl text-amber-100/70" aria-hidden="true">✦</div>
       {children}
     </div>
   )

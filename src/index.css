@@ -21,6 +21,47 @@ body {
   margin: 0;
 }
 
+.joy-paper-grain {
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.72'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+.joy-paper-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.joy-paper-card::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  opacity: 0.15;
+  background-image: repeating-linear-gradient(100deg, transparent 0 5px, rgba(255,255,255,0.18) 6px 7px, transparent 8px 15px);
+  pointer-events: none;
+}
+
+.joy-spark {
+  z-index: 1;
+  color: #ffe59c;
+  font-size: clamp(1.4rem, 3vw, 2.75rem);
+  filter: drop-shadow(0 0 12px rgba(255, 223, 140, 0.75));
+  animation: joy-twinkle 3.6s ease-in-out infinite;
+}
+
+.joy-spark-two { animation-delay: -1.2s; }
+.joy-spark-three { animation-delay: -2.25s; }
+
+@keyframes joy-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.72) rotate(0deg); }
+  48% { opacity: 1; transform: scale(1.2) rotate(18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .joy-spark { animation: none; }
+}
+
 button,
 input,
 textarea,

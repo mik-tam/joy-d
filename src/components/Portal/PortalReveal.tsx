@@ -8,7 +8,7 @@ import {
   type JoyCapsule,
 } from '../../data/joyCapsule'
 import { findSmileMatch, SmileMatchError, type SmileMatch } from '../../data/smileMatch'
-import { playConnectionChime, playDiscoveryChime, setJoySoundsEnabled, stopJoySounds } from '../../data/joySounds'
+import { playConnectionChime, playDiscoveryChime, playPortalChime, setJoySoundsEnabled, stopJoySounds } from '../../data/joySounds'
 
 type PortalRevealProps = {
   onClose: () => void
@@ -35,6 +35,7 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
   const [deepeningError, setDeepeningError] = useState<string | null>(null)
   const [storyOpen, setStoryOpen] = useState(false)
   const [chimesOn, setChimesOn] = useState(false)
+  const [isReading, setIsReading] = useState(false)
   const initialRequestStarted = useRef(false)
   const travel = reduceMotion ? 24 : 1300
   const duration = reduceMotion ? 0.2 : 0.95
@@ -97,12 +98,33 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
     void gatherFirstWorld()
   }, [gatherFirstWorld])
 
-  useEffect(() => () => stopJoySounds(), [])
+  useEffect(() => () => {
+    stopJoySounds()
+    window.speechSynthesis?.cancel()
+  }, [])
 
   const toggleChimes = () => {
     const nextValue = !chimesOn
     setChimesOn(nextValue)
     setJoySoundsEnabled(nextValue)
+    if (nextValue) playPortalChime()
+  }
+
+  const stopReading = () => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    setIsReading(false)
+  }
+
+  const readCapsuleAloud = (capsule: JoyCapsule) => {
+    if (!('speechSynthesis' in window)) return
+    stopReading()
+    const utterance = new SpeechSynthesisUtterance(`${capsule.worldName}. ${capsule.story} ${capsule.quote}`)
+    utterance.rate = 0.88
+    utterance.pitch = 1.08
+    utterance.onend = () => setIsReading(false)
+    utterance.onerror = () => setIsReading(false)
+    setIsReading(true)
+    window.speechSynthesis.speak(utterance)
   }
 
   const activeCapsule = capsules[activeCapsuleIndex] ?? null
@@ -118,6 +140,7 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
       aria-labelledby="portal-title"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,197,132,0.32),transparent_18%),radial-gradient(circle_at_26%_70%,rgba(185,162,255,0.24),transparent_34%),radial-gradient(circle_at_77%_24%,rgba(130,233,210,0.18),transparent_30%)]" />
+      <div className="joy-paper-grain absolute inset-0" aria-hidden="true" />
       <button
         type="button"
         onClick={toggleChimes}
@@ -206,8 +229,13 @@ export function PortalReveal({ onClose, signature }: PortalRevealProps) {
           canGoDeeper={capsules.length < 3}
           onRetry={() => void gatherFirstWorld()}
           onGoDeeper={() => void goDeeper()}
-          onSelectDiscovery={setActiveCapsuleIndex}
+          onSelectDiscovery={(index) => {
+            stopReading()
+            setActiveCapsuleIndex(index)
+          }}
           onOpenStory={() => setStoryOpen(true)}
+          onReadAloud={() => activeCapsule && readCapsuleAloud(activeCapsule)}
+          isReading={isReading}
         />
         <button
           type="button"
@@ -243,6 +271,8 @@ function JoyCapsuleMoment({
   onGoDeeper,
   onSelectDiscovery,
   onOpenStory,
+  onReadAloud,
+  isReading,
 }: {
   capsule: JoyCapsule | null
   status: CapsuleStatus
@@ -255,6 +285,8 @@ function JoyCapsuleMoment({
   onGoDeeper: () => void
   onSelectDiscovery: (index: number) => void
   onOpenStory: () => void
+  onReadAloud: () => void
+  isReading: boolean
 }) {
   if (status === 'loading') {
     return (
@@ -338,7 +370,7 @@ function JoyCapsuleMoment({
       initial={{ opacity: 0, y: 10, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.45, ease: 'easeOut' }}
-      className="mx-auto mt-6 max-w-sm rounded-3xl border border-amber-100/20 bg-purple-950/45 p-5 text-left shadow-xl shadow-purple-950/30"
+      className="joy-paper-card mx-auto mt-6 max-w-sm rounded-3xl border border-amber-100/35 bg-[linear-gradient(145deg,rgba(70,42,107,0.9),rgba(35,18,68,0.88)_65%,rgba(15,62,81,0.82))] p-5 text-left shadow-[0_18px_45px_rgba(9,4,25,0.42)]"
     >
       <div className="flex items-center justify-between gap-3 text-xs font-bold tracking-[0.18em] text-amber-100/80">
         <span>{discoveryNumber === 1 ? 'YOUR FIRST JOY CAPSULE' : `DISCOVERY ${discoveryNumber}`}</span>
@@ -347,6 +379,15 @@ function JoyCapsuleMoment({
       <h2 className="mt-2 font-serif text-3xl font-black tracking-[-0.04em] text-white">{capsule.worldName}</h2>
       <p className="mt-3 text-sm leading-relaxed text-white/75">{capsule.story}</p>
       <blockquote className="mt-4 border-l-2 border-amber-100/55 pl-3 text-sm italic text-amber-50/90">“{capsule.quote}”</blockquote>
+      <button
+        type="button"
+        onClick={onReadAloud}
+        disabled={isReading}
+        className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-amber-50 transition hover:bg-white/20 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-amber-100/50"
+      >
+        <Volume2 className="size-3.5" aria-hidden="true" />
+        {isReading ? 'The world is speaking…' : 'Hear this world'}
+      </button>
       <div className="mt-4 grid gap-2 border-t border-white/10 pt-4 text-xs text-white/65">
         <p><span className="font-bold text-amber-100/80">LOOK:</span> {capsule.visualDirection}</p>
         <p><span className="font-bold text-amber-100/80">SOUND:</span> {capsule.soundMood}</p>
