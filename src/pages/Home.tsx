@@ -5,6 +5,7 @@ import { SmileCamera } from '../components/SmileCamera/SmileCamera'
 
 export function Home() {
   const [screen, setScreen] = useState<'welcome' | 'camera'>('welcome')
+  const reduceMotion = useReducedMotion()
 
   if (screen === 'camera') {
     return <SmileCamera onBack={() => setScreen('welcome')} />
@@ -18,7 +19,7 @@ export function Home() {
 
       <section className="w-full max-w-5xl text-center sm:text-left">
         <motion.p
-          initial={{ opacity: 0, y: -12 }}
+          initial={reduceMotion ? false : { opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="mb-7 flex items-center justify-center gap-2 text-xs font-bold tracking-[0.32em] text-amber-100/90 sm:justify-start"
@@ -28,7 +29,7 @@ export function Home() {
         </motion.p>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.92, y: 18 }}
+          initial={reduceMotion ? false : { opacity: 0, scale: 0.92, y: 18 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.1, ease: 'easeOut' }}
           className="joy-paper-card max-w-2xl rounded-[2.5rem] border border-[#ffe7a3]/40 bg-[#2c1b50]/68 p-8 shadow-[0_24px_80px_rgba(20,8,42,0.38)] backdrop-blur-xl sm:p-14"
@@ -59,7 +60,7 @@ export function Home() {
         </motion.div>
 
         <motion.p
-          initial={{ opacity: 0 }}
+          initial={reduceMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.75 }}
           className="mt-7 max-w-md text-sm leading-relaxed text-white/70 sm:mx-0"
@@ -73,62 +74,53 @@ export function Home() {
 
 function LayeredLanding() {
   const reduceMotion = useReducedMotion()
-  const flowers = [
-    { left: '68%', bottom: '18%', color: '#f6a2b9', delay: -0.6, size: 56 },
-    { left: '86%', bottom: '30%', color: '#ffcf78', delay: -2.7, size: 42 },
-    { left: '77%', bottom: '10%', color: '#c3a7fa', delay: -4.1, size: 70 },
-    { left: '94%', bottom: '12%', color: '#f4b2d4', delay: -1.4, size: 48 },
-  ]
-  const stars = Array.from({ length: 13 }, (_, index) => ({ left: `${46 + ((index * 13) % 51)}%`, top: `${7 + ((index * 17) % 44)}%`, delay: -index * 0.46 }))
 
   return (
     <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden" aria-hidden="true">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_82%,#f7a169_0%,#b65f82_24%,#493665_52%,#171033_100%)]" />
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, x: 140 }}
-        animate={reduceMotion ? { opacity: 0.9 } : { opacity: 0.9, x: [140, 0, 24, 0] }}
-        transition={{ duration: 13, ease: 'easeOut' }}
-        className="absolute right-[10%] top-[7%] size-32 rounded-full bg-[#ffe8a5] shadow-[0_0_0_14px_rgba(255,222,152,0.13),0_0_75px_rgba(255,210,136,0.55)]"
+      <div className="absolute inset-0 bg-[#211638]" />
+      <motion.img
+        src="/art/lantern-sea-hero.png"
+        alt=""
+        initial={reduceMotion ? false : { opacity: 0, scale: 1.07 }}
+        animate={reduceMotion ? { opacity: 0.43 } : { opacity: [0, 0.48, 0.43], scale: [1.07, 1.02, 1.05], x: [0, -8, 0] }}
+        transition={{ duration: 18, ease: 'easeInOut' }}
+        className="absolute inset-0 h-full w-full object-cover object-center mix-blend-screen"
       />
-      {stars.map((star, index) => (
-        <motion.span
-          key={index}
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.2 }}
-          animate={reduceMotion ? { opacity: 0.7 } : { opacity: [0.15, 1, 0.2], scale: [0.5, 1.35, 0.6], y: [0, -14, 0] }}
-          transition={{ duration: 3.4 + (index % 3), repeat: Infinity, delay: star.delay }}
-          className="absolute text-amber-100 drop-shadow-[0_0_10px_rgba(255,224,149,0.9)]"
-          style={{ left: star.left, top: star.top }}
-        >
-          {index % 3 === 0 ? '✦' : '·'}
-        </motion.span>
-      ))}
-      {[0, 1, 2].map((index) => (
-        <motion.div
-          key={`cloud-${index}`}
-          initial={reduceMotion ? false : { x: index === 1 ? '105vw' : '-45vw', opacity: 0 }}
-          animate={reduceMotion ? { opacity: 0.34, x: index === 1 ? '58vw' : `${46 + index * 13}vw` } : { x: index === 1 ? ['105vw', '45vw', '68vw'] : ['-45vw', `${38 + index * 16}vw`, `${55 + index * 12}vw`], opacity: [0, 0.44, 0.18] }}
-          transition={{ duration: 20 + index * 7, repeat: Infinity, ease: 'easeInOut', delay: -index * 4.5 }}
-          className="absolute top-[18%] h-24 w-72 rounded-[50%] bg-[#ffd9d0]/35 blur-[1px] before:absolute before:-left-10 before:top-7 before:size-24 before:rounded-full before:bg-[#ffd9d0]/35 after:absolute after:right-7 after:-top-7 after:size-28 after:rounded-full after:bg-[#ffd9d0]/35"
-        />
-      ))}
-      {[0, 1, 2, 3].map((index) => (
-        <motion.div
-          key={`wave-${index}`}
-          initial={reduceMotion ? false : { x: index % 2 ? '100%' : '-100%' }}
-          animate={reduceMotion ? { x: 0 } : { x: index % 2 ? ['100%', '-4%', '12%'] : ['-100%', '4%', '-12%'] }}
-          transition={{ duration: 12 + index * 3.5, repeat: Infinity, ease: 'easeInOut', delay: -index * 2 }}
-          className="absolute -left-[12%] h-44 w-[124%] rounded-[48%] border-t border-white/20"
-          style={{ bottom: `${-2 + index * 9}%`, background: ['#0d506b', '#126d7b', '#1d8a8e', '#64b7ad'][index], opacity: 0.94 - index * 0.1, transform: `rotate(${index % 2 ? 2 : -2}deg)` }}
-        />
-      ))}
-      {flowers.map((flower, index) => (
-        <motion.div
-          key={flower.left}
-          initial={reduceMotion ? false : { opacity: 0, y: 100, rotate: -16 }}
-          animate={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 1, y: [0, -15, 0], rotate: [-7, 7, -7] }}
-          transition={{ duration: 6 + index, repeat: Infinity, ease: 'easeInOut', delay: flower.delay }}
-          className="absolute grid place-items-center rounded-full"
-          style={{ left: flower.left, bottom: flower.bottom, width: flower.size, height: flower.size, background: `radial-gradient(circle, #ffe99c 0 16%, transparent 17%), conic-gradient(from 0deg, ${flower.color} 0 12%, transparent 12% 20%, ${flower.color} 20% 32%, transparent 32% 40%, ${flower.color} 40% 52%, transparent 52% 60%, ${flower.color} 60% 72%, transparent 72% 80%, ${flower.color} 80% 92%, transparent 92%)`, filter: 'drop-shadow(0 6px 8px rgba(28,10,50,.3))' }}
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(25,13,50,0.34),transparent_58%,rgba(20,10,42,0.12))]" />
+      <motion.img
+        src="/art/dusk-cloud-bank.png"
+        alt=""
+        initial={reduceMotion ? false : { opacity: 0, x: '52vw' }}
+        animate={reduceMotion ? { opacity: 0.68, x: '19vw' } : { opacity: [0, 0.7, 0.6], x: ['52vw', '19vw', '23vw'], y: ['-8vh', '1vh', '-1vh'] }}
+        transition={{ duration: 26, ease: 'easeInOut', repeat: Infinity }}
+        className="absolute -top-[9%] h-[54%] w-[96%] max-w-[90rem] object-contain object-top opacity-70"
+      />
+      <motion.img
+        src="/art/dusk-cloud-bank.png"
+        alt=""
+        initial={reduceMotion ? false : { opacity: 0, x: '-70vw' }}
+        animate={reduceMotion ? { opacity: 0.78, x: '-13vw' } : { opacity: [0, 0.8, 0.72], x: ['-70vw', '-13vw', '8vw'], y: [0, -10, 0] }}
+        transition={{ duration: 34, ease: 'easeInOut', repeat: Infinity }}
+        className="absolute top-[13%] h-[46%] w-[118%] max-w-none object-contain object-left"
+      />
+      <motion.img
+        src="/art/dusk-cloud-bank.png"
+        alt=""
+        initial={reduceMotion ? false : { opacity: 0, x: '76vw' }}
+        animate={reduceMotion ? { opacity: 0.42, x: '14vw' } : { opacity: [0, 0.42, 0.34], x: ['76vw', '14vw', '-8vw'], y: [8, 0, 10] }}
+        transition={{ duration: 42, ease: 'easeInOut', repeat: Infinity, delay: -12 }}
+        className="absolute top-[30%] h-[34%] w-[104%] max-w-none scale-x-[-1] object-contain object-right"
+      />
+      {[{ bottom: '-4%', opacity: 0.64, duration: 24, delay: -3, scale: 1.15 }, { bottom: '-13%', opacity: 0.84, duration: 30, delay: -13, scale: 1.34 }, { bottom: '-22%', opacity: 1, duration: 36, delay: -21, scale: 1.58 }].map((wave, index) => (
+        <motion.img
+          key={wave.bottom}
+          src="/art/moonlit-wave-band.png"
+          alt=""
+          initial={reduceMotion ? false : { opacity: 0, x: index % 2 ? '80vw' : '-80vw' }}
+          animate={reduceMotion ? { opacity: wave.opacity, x: '-10vw' } : { opacity: [0, wave.opacity, wave.opacity], x: [index % 2 ? '80vw' : '-80vw', '-10vw', index % 2 ? '-24vw' : '4vw'], y: [0, -8, 0] }}
+          transition={{ duration: wave.duration, ease: 'easeInOut', repeat: Infinity, delay: wave.delay }}
+          className="absolute h-[46%] w-[138%] max-w-none object-contain object-bottom"
+          style={{ bottom: wave.bottom, scale: wave.scale }}
         />
       ))}
       <motion.img
@@ -137,7 +129,15 @@ function LayeredLanding() {
         initial={reduceMotion ? false : { opacity: 0, x: '120vw', y: 25, rotate: 8 }}
         animate={reduceMotion ? { opacity: 1, x: 0, y: 0 } : { opacity: 1, x: ['120vw', '7vw', '11vw', '7vw'], y: [25, 0, -14, 0], rotate: [8, -3, 2, -3] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-[8%] right-[4%] w-[min(38vw,31rem)] drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)]"
+        className="absolute bottom-[8%] right-[10%] w-[min(36vw,29rem)] drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)]"
+      />
+      <motion.img
+        src="/art/portal-garden.png"
+        alt=""
+        initial={reduceMotion ? false : { opacity: 0, x: '36vw', y: 30 }}
+        animate={reduceMotion ? { opacity: 1, x: 0, y: 0 } : { opacity: [0, 1, 1], x: ['36vw', '0vw', '1vw'], y: [30, 0, -8] }}
+        transition={{ duration: 16, ease: 'easeInOut', repeat: Infinity }}
+        className="absolute -bottom-[3%] -right-[5%] w-[min(48vw,43rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
       />
     </div>
   )
