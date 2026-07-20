@@ -11,6 +11,7 @@ import {
 import { useSmileDetection } from './useSmileDetection'
 import { createJoySignature, type JoySignature } from './createJoySignature'
 import { PortalReveal } from '../Portal/PortalReveal'
+import { playPortalChime, setJoySoundsEnabled } from '../../data/joySounds'
 
 type CameraState = 'idle' | 'requesting' | 'preview' | 'denied' | 'unsupported'
 
@@ -33,7 +34,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     setSmileUnlocked(true)
   }, [])
   const { error: smileError, smileScore, status: smileStatus } = useSmileDetection({
-    enabled: cameraState === 'preview' && !smileUnlocked,
+    enabled: cameraState === 'preview',
     videoRef,
     onSmileDetected: handleSmileDetected,
   })
@@ -49,7 +50,10 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
 
   const openPortal = () => {
     if (!smileUnlocked || !joySignature) return
-    stopCamera()
+    // The camera stays on inside the portal: the live smile keeps lighting
+    // the worlds and charging the next door. Frames never leave the browser.
+    setJoySoundsEnabled(true)
+    playPortalChime()
     setPortalOpen(true)
   }
 
@@ -182,7 +186,12 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
       </section>
       <AnimatePresence>
         {portalOpen && joySignature && (
-          <PortalReveal signature={joySignature} onClose={returnToSmile} />
+          <PortalReveal
+            signature={joySignature}
+            smileScore={smileScore}
+            smileStatus={smileStatus}
+            onClose={returnToSmile}
+          />
         )}
       </AnimatePresence>
     </main>
@@ -191,8 +200,8 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
 
 function CameraFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="relative mx-auto mt-7 aspect-square w-full max-w-[21rem] overflow-hidden rounded-[2rem] border border-[#ffe7a3]/35 bg-purple-950/45 shadow-[inset_0_0_0_5px_rgba(255,255,255,0.04),0_15px_35px_rgba(17,7,39,0.35)]">
-      <div className="absolute inset-3 rounded-[1.55rem] border border-amber-100/35" />
+    <div className="relative mx-auto mt-7 aspect-square w-full max-w-[21rem] overflow-hidden rounded-t-[9rem] rounded-b-[2rem] border border-[#ffe7a3]/35 bg-purple-950/45 shadow-[inset_0_0_0_5px_rgba(255,255,255,0.04),0_15px_35px_rgba(17,7,39,0.35)]">
+      <div className="absolute inset-3 rounded-t-[8rem] rounded-b-[1.55rem] border border-amber-100/35" />
       <div className="pointer-events-none absolute -right-5 -top-6 text-4xl text-amber-100/70" aria-hidden="true">✦</div>
       {children}
     </div>
@@ -284,7 +293,6 @@ function PreviewState({
   onCelebrationComplete: () => void
 }) {
   const reduceMotion = useReducedMotion()
-  const signalPercent = Math.round(smileScore * 100)
   const statusCopy = {
     idle: 'Waking the smile signal…',
     loading: 'Learning the shape of a smile…',
@@ -321,20 +329,20 @@ function PreviewState({
       </h1>
       <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
         {smileUnlocked
-          ? 'Your first JOY:D signal is glowing. Step through when you’re ready.'
+          ? 'Your first JOY:D signal is glowing. Step through when you’re ready — inside, your smile stays the key.'
           : statusCopy}
       </p>
       {smileStatus !== 'unavailable' && !smileUnlocked && (
-        <div className="mx-auto mt-7 max-w-xs">
-          <div className="h-2 overflow-hidden rounded-full bg-white/10">
-            <motion.div
-              animate={{ width: `${Math.min(signalPercent, 100)}%` }}
-              className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
-              transition={{ duration: 0.18 }}
+        <div className="mx-auto mt-7 flex flex-col items-center">
+          <div className="relative h-16 w-12 overflow-hidden rounded-t-[1.6rem] border-2 border-amber-100/40 bg-white/5 shadow-[0_0_18px_rgba(255,231,163,0.15)]">
+            <div
+              className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-amber-200 via-rose-300 to-fuchsia-300 transition-[height] duration-200"
+              style={{ height: `${Math.min(Math.round((smileScore / 0.45) * 100), 100)}%` }}
             />
+            <div className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-purple-950/55" aria-hidden="true" />
           </div>
           <p className="mt-2 text-xs font-semibold tracking-wide text-white/55">
-            JOY SIGNAL {signalPercent}%
+            {smileScore >= 0.45 ? 'The little door is opening…' : 'Your smile fills the little door'}
           </p>
         </div>
       )}

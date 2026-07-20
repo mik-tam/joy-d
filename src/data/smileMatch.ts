@@ -1,6 +1,7 @@
 import type { JoySignature } from '../components/SmileCamera/createJoySignature'
 
 export type SmileMatch = {
+  matchColorTrail: string[]
   matchSource: 'demo' | 'live'
   sharedShape: JoySignature['shape']
   similarity: number
@@ -43,6 +44,9 @@ export async function findSmileMatch(signature: JoySignature): Promise<SmileMatc
     !Number.isInteger(match.similarity)
   ) {
     throw new SmileMatchError('The local matching constellation returned an incomplete signal.')
+  }
+  if (!Array.isArray(match.matchColorTrail) || !match.matchColorTrail.every((color) => typeof color === 'string')) {
+    match.matchColorTrail = []
   }
 
   return match as SmileMatch

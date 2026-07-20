@@ -24,12 +24,23 @@ export function stopWorldSoundscape() {
 
 function soundProfile(soundMood: string) {
   const mood = soundMood.toLowerCase()
-  if (/sea|wave|tide|water|harbour|ocean/.test(mood)) return { notes: [146.83, 220, 293.66], type: 'sine' as OscillatorType, pulse: 6.8 }
-  if (/forest|leaf|bird|wind|garden|bloom/.test(mood)) return { notes: [261.63, 329.63, 392], type: 'triangle' as OscillatorType, pulse: 4.8 }
-  if (/star|space|moon|cosmic|glow|bell/.test(mood)) return { notes: [293.66, 440, 659.25], type: 'sine' as OscillatorType, pulse: 3.7 }
-  if (/rainbow|bright|sun|laugh|warm/.test(mood)) return { notes: [329.63, 493.88, 659.25], type: 'triangle' as OscillatorType, pulse: 3.2 }
-  return { notes: [196, 293.66, 392], type: 'sine' as OscillatorType, pulse: 5.4 }
+  if (/sea|wave|tide|water|harbour|ocean/.test(mood)) {
+    return { root: 146.83, noiseFrequency: 420, noiseQ: 0.6, swell: 7.2, plinkEveryMs: 4200 }
+  }
+  if (/forest|leaf|bird|wind|garden|bloom/.test(mood)) {
+    return { root: 261.63, noiseFrequency: 900, noiseQ: 1.1, swell: 5.4, plinkEveryMs: 3200 }
+  }
+  if (/star|space|moon|cosmic|glow|bell/.test(mood)) {
+    return { root: 293.66, noiseFrequency: 1400, noiseQ: 2.4, swell: 8.5, plinkEveryMs: 2600 }
+  }
+  if (/rainbow|bright|sun|laugh|warm/.test(mood)) {
+    return { root: 329.63, noiseFrequency: 1100, noiseQ: 1.4, swell: 4.4, plinkEveryMs: 2300 }
+  }
+  return { root: 196, noiseFrequency: 700, noiseQ: 0.9, swell: 6.2, plinkEveryMs: 3600 }
 }
+
+// Pentatonic offsets keep every wandering plink consonant with the world's root.
+const pentatonic = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2, 9 / 4, 5 / 2]
 
 export function startWorldSoundscape(soundMood: string) {
   if (!soundEnabled) return
@@ -39,31 +50,74 @@ export function startWorldSoundscape(soundMood: string) {
   stopWorldSoundscape()
   void context.resume().catch(() => undefined)
   const profile = soundProfile(soundMood)
+
   const master = context.createGain()
-  master.gain.value = 0.026
+  master.gain.value = 0.05
   master.connect(context.destination)
-  const oscillators = profile.notes.map((frequency, index) => {
+
+  // A soft filtered-noise bed: surf, wind, or starlight hiss depending on mood.
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate)
+  const channel = noiseBuffer.getChannelData(0)
+  for (let index = 0; index < channel.length; index += 1) {
+    channel[index] = Math.random() * 2 - 1
+  }
+  const noise = context.createBufferSource()
+  noise.buffer = noiseBuffer
+  noise.loop = true
+  const noiseFilter = context.createBiquadFilter()
+  noiseFilter.type = 'bandpass'
+  noiseFilter.frequency.value = profile.noiseFrequency
+  noiseFilter.Q.value = profile.noiseQ
+  const noiseGain = context.createGain()
+  noiseGain.gain.value = 0.28
+  const swell = context.createOscillator()
+  const swellGain = context.createGain()
+  swell.frequency.value = 1 / profile.swell
+  swellGain.gain.value = 0.14
+  swell.connect(swellGain)
+  swellGain.connect(noiseGain.gain)
+  noise.connect(noiseFilter)
+  noiseFilter.connect(noiseGain)
+  noiseGain.connect(master)
+  noise.start()
+  swell.start()
+
+  // A warm low anchor tone underneath the bed.
+  const anchor = context.createOscillator()
+  const anchorGain = context.createGain()
+  anchor.type = 'sine'
+  anchor.frequency.value = profile.root / 2
+  anchorGain.gain.value = 0.16
+  anchor.connect(anchorGain)
+  anchorGain.connect(master)
+  anchor.start()
+
+  // Occasional music-box plinks wandering a pentatonic scale.
+  const playPlink = () => {
+    const now = context.currentTime + 0.02
+    const step = pentatonic[Math.floor(Math.random() * pentatonic.length)]
+    const frequency = profile.root * step * (Math.random() < 0.3 ? 2 : 1)
     const oscillator = context.createOscillator()
     const gain = context.createGain()
-    oscillator.type = index === 1 ? 'sine' : profile.type
-    oscillator.frequency.value = frequency / (index === 0 ? 2 : 1)
-    gain.gain.value = index === 2 ? 0.2 : 0.34
+    oscillator.type = 'sine'
+    oscillator.frequency.value = frequency
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(0.11, now + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6)
     oscillator.connect(gain)
     gain.connect(master)
-    oscillator.start()
-    return oscillator
-  })
-  const tremolo = context.createOscillator()
-  const tremoloGain = context.createGain()
-  tremolo.frequency.value = 1 / profile.pulse
-  tremoloGain.gain.value = 0.018
-  tremolo.connect(tremoloGain)
-  tremoloGain.connect(master.gain)
-  tremolo.start()
+    oscillator.start(now)
+    oscillator.stop(now + 1.7)
+  }
+  const plinkTimer = setInterval(() => {
+    if (Math.random() < 0.75) playPlink()
+  }, profile.plinkEveryMs)
 
   worldSoundCleanup = () => {
-    oscillators.forEach((oscillator) => oscillator.stop())
-    tremolo.stop()
+    clearInterval(plinkTimer)
+    noise.stop()
+    swell.stop()
+    anchor.stop()
     master.disconnect()
   }
 }

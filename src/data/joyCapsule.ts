@@ -1,7 +1,39 @@
 import type { JoySignature } from '../components/SmileCamera/createJoySignature'
 
+export type WorldSceneBiome =
+  | 'moonlit-sea'
+  | 'cloud-garden'
+  | 'star-harbor'
+  | 'sunrise-meadow'
+  | 'night-interior'
+
+export type WorldSceneSprite =
+  | 'lantern-boat'
+  | 'crescent-moon'
+  | 'garden-door'
+  | 'cloud'
+  | 'wave'
+  | 'star'
+
+export type WorldSceneElement = {
+  description: string
+  sprite: WorldSceneSprite
+  size: 'tiny' | 'small' | 'grand' | 'colossal'
+  x: number
+  y: number
+  flip: boolean
+  motion: 'drift' | 'bob' | 'spin-slow' | 'float' | 'still'
+}
+
+export type WorldScene = {
+  backdrop?: string
+  biome: WorldSceneBiome
+  elements: WorldSceneElement[]
+}
+
 export type JoyCapsule = {
   quote: string
+  scene?: WorldScene
   soundMood: string
   story: string
   surprise: string

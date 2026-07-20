@@ -30,24 +30,30 @@ Key decisions accelerated with Codex and GPT-5.6:
 
 1. Open the camera and smile.
 2. JOY:D detects the smile locally in the browser and creates a playful, non-scientific Smile Signature.
-3. A portal opens into a first AI Joy Capsule: a world name, story, quote, sound mood, visual direction, and hidden thing.
-4. Follow the glimmer through up to three distinct discoveries.
-5. Create and share a Joy Story.
-6. Let the signature find another anonymous JOY:D traveler.
+3. A portal opens into a darkened star-void where the world's story writes itself out typewriter-style — the reading time doubles as painting time, and the finished world then fades in as layered generated art with its name and quote floating over it.
+4. Inside the portal the smile stays the key: the live smile lights each world, and holding a smile charges the next door open (tapping always works too). Each Smile Signature shape unlocks a little differently.
+5. Follow the glimmer through up to three distinct discoveries.
+6. Create and share a Joy Story.
+7. Let the signature find another anonymous JOY:D traveler.
 
 ## Built with
 
 - React, TypeScript, Vite, Tailwind CSS, and Framer Motion
 - MediaPipe Face Landmarker for browser-local smile signal detection
 - OpenAI-compatible API calls through OpenRouter or OpenAI for Joy Capsule generation
+- AI scene casting: the model writes a vivid visual description for every element of its own story (a miniature boat, travelers stepping off clouds) plus a backdrop line, with escalating whimsy briefs per depth and a deterministic fallback scene when a model cannot hold the schema
+- Live world painting: each world's actual visuals are generated in real time — transparent watercolor sprites for every cast element plus a distant backdrop, style-locked to the capsule's LOOK direction. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or directly through OpenAI's `gpt-image-1` otherwise; `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit and the generated art blooms in as it arrives; without image credit the kit remains the complete experience
 - Express for a tiny local API server
-- Web Audio API for optional, gentle, user-enabled chimes
+- Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
+- A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
 
 ## Privacy by design
 
 JOY:D is a creative experience, not an emotion-analysis or biometric-identification product.
 
 - Camera frames, video, face landmarks, and raw smile measurements stay in the browser and are never sent to the server.
+- The camera remains active inside the portal so the live smile can light each world and open doors. This is disclosed in the portal UI, processing stays entirely in the browser, and the camera stops when the portal closes.
+- World image generation sends only AI-generated story text (element descriptions, backdrop line, and the LOOK direction) to the image API — never camera frames, face data, or anything typed by the user.
 - The AI generator receives a playful creative signature: a shape, a signal percentage, a three-color trail, and a whimsical title. On deeper discoveries, it also receives earlier world names solely to avoid repeating them.
 - Smile Matching receives only shape, signal percentage, color trail, and a temporary random session token that prevents matching a browser session with itself. It never uses a name, account, location, camera frame, or face data.
 - Local matching entries live only in server memory, are removed when the next match request finds them older than 30 minutes, and disappear when the local server restarts. The first matching result may use a clearly disclosed seeded demo traveler so the demo has a satisfying ending.
@@ -112,8 +118,8 @@ The matching pool remains in process memory only: it is ephemeral, capped, and c
 
 1. Allow the browser camera permission.
 2. Hold a smile until **Enter your first JOY:D world** appears.
-3. Open the portal, then select **Go deeper** twice.
-4. Open **Create my Joy Story**, then select **Let my smile find another**.
+3. Open the portal, then hold a smile until the next door charges open (or tap **Go deeper**) — twice.
+4. Open **Create my Joy Story** with one long smile (or a tap), then select **Let my smile find another**.
 
 The matching finale is local and anonymous. Its first result may be a clearly disclosed seeded demo traveler; a later local session can match a short-lived anonymous live traveler.
 
