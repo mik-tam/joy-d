@@ -82,70 +82,70 @@ function LayeredLanding() {
       <motion.img
         src="/art/painted-stars.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, y: '-32vh', scale: 0.82 }}
-        animate={reduceMotion ? { opacity: 1, y: 0, scale: 1 } : { opacity: [0, 1, 1], y: ['-32vh', '0vh', '-1vh'], scale: [0.82, 1, 1] }}
-        transition={{ duration: 12, ease: 'easeOut' }}
-        className="absolute -top-[6%] left-[26%] h-[58%] w-[86%] max-w-none object-contain object-top"
+        initial={reduceMotion ? false : { y: '-24vh', scale: 0.82 }}
+        animate={reduceMotion ? { y: 0, scale: 1 } : { y: ['-24vh', '0vh', '-1vh'], scale: [0.82, 1, 1] }}
+        transition={{ duration: 6, ease: 'easeOut' }}
+        className="absolute top-[2%] left-[28%] h-[42%] w-[66%] max-w-none object-contain object-top"
       />
       <motion.img
         src="/art/crescent-moon.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, y: '-56vh', rotate: -10 }}
-        animate={reduceMotion ? { opacity: 1, y: 0, rotate: 0 } : { opacity: [0, 1, 1], y: ['-56vh', '0vh', '-1vh'], rotate: [-10, 0, 1] }}
-        transition={{ duration: 13, ease: 'easeOut', delay: 0.35 }}
-        className="absolute -top-[13%] right-[6%] h-[38%] w-[38%] max-w-[32rem] object-contain object-top drop-shadow-[0_0_38px_rgba(255,225,148,0.38)]"
+        initial={reduceMotion ? false : { y: '-32vh', rotate: -10 }}
+        animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['-32vh', '0vh', '-1vh'], rotate: [-10, 0, 1] }}
+        transition={{ duration: 5.5, ease: 'easeOut', delay: 0.2 }}
+        className="absolute top-[5%] right-[12%] z-10 h-[27%] w-[27%] max-w-[23rem] object-contain object-top drop-shadow-[0_0_38px_rgba(255,225,148,0.38)]"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, x: '52vw' }}
-        animate={reduceMotion ? { opacity: 1, x: '19vw' } : { opacity: [0, 1, 1], x: ['52vw', '19vw', '23vw'], y: ['-8vh', '1vh', '-1vh'] }}
-        transition={{ duration: 26, ease: 'easeInOut', repeat: Infinity }}
-        className="absolute -top-[9%] h-[54%] w-[96%] max-w-[90rem] object-contain object-top"
+        initial={reduceMotion ? false : { x: '100vw' }}
+        animate={reduceMotion ? { x: 0 } : { x: ['100vw', '0vw'], y: ['-5vh', '0vh'] }}
+        transition={{ duration: 9, ease: 'easeOut' }}
+        className="absolute top-[5%] right-[3%] h-[34%] w-[78%] max-w-[72rem] object-contain object-top"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, x: '-70vw' }}
-        animate={reduceMotion ? { opacity: 1, x: '-13vw' } : { opacity: [0, 1, 1], x: ['-70vw', '-13vw', '8vw'], y: [0, -10, 0] }}
-        transition={{ duration: 34, ease: 'easeInOut', repeat: Infinity }}
-        className="absolute top-[13%] h-[46%] w-[118%] max-w-none object-contain object-left"
+        initial={reduceMotion ? false : { x: '-100vw' }}
+        animate={reduceMotion ? { x: 0 } : { x: ['-100vw', '0vw'], y: [0, '-2vh'] }}
+        transition={{ duration: 10, ease: 'easeOut', delay: 0.4 }}
+        className="absolute top-[28%] left-[0%] h-[30%] w-[78%] max-w-[72rem] object-contain object-left"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, x: '76vw' }}
-        animate={reduceMotion ? { opacity: 1, x: '14vw' } : { opacity: [0, 1, 1], x: ['76vw', '14vw', '-8vw'], y: [8, 0, 10] }}
-        transition={{ duration: 42, ease: 'easeInOut', repeat: Infinity, delay: -12 }}
-        className="absolute top-[30%] h-[34%] w-[104%] max-w-none scale-x-[-1] object-contain object-right"
+        initial={reduceMotion ? false : { x: '100vw' }}
+        animate={reduceMotion ? { x: 0 } : { x: ['100vw', '0vw'], y: ['2vh', '0vh'] }}
+        transition={{ duration: 11, ease: 'easeOut', delay: 0.7 }}
+        className="absolute top-[43%] right-[0%] h-[25%] w-[70%] max-w-[64rem] scale-x-[-1] object-contain object-right"
+      />
+      <motion.img
+        src="/art/portal-garden.png"
+        alt=""
+        initial={reduceMotion ? false : { y: '105vh', rotate: -2 }}
+        animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['105vh', '0vh', '-1vh'], rotate: [-2, 0, 1] }}
+        transition={{ duration: 10, ease: 'easeOut', delay: 1 }}
+        className="absolute bottom-[12%] right-[3%] z-10 w-[min(38vw,35rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
       />
       {[{ bottom: '-4%', duration: 24, delay: -3, scale: 1.15 }, { bottom: '-13%', duration: 30, delay: -13, scale: 1.34 }, { bottom: '-22%', duration: 36, delay: -21, scale: 1.58 }].map((wave, index) => (
         <motion.img
           key={wave.bottom}
           src="/art/moonlit-wave-band.png"
           alt=""
-          initial={reduceMotion ? false : { opacity: 0, x: index % 2 ? '80vw' : '-80vw' }}
-          animate={reduceMotion ? { opacity: 1, x: '-10vw' } : { opacity: [0, 1, 1], x: [index % 2 ? '80vw' : '-80vw', '-10vw', index % 2 ? '-24vw' : '4vw'], y: [0, -8, 0] }}
+          initial={reduceMotion ? false : { x: index % 2 ? '80vw' : '-80vw' }}
+          animate={reduceMotion ? { x: '-10vw' } : { x: [index % 2 ? '80vw' : '-80vw', '-10vw', index % 2 ? '-24vw' : '4vw'], y: [0, -8, 0] }}
           transition={{ duration: wave.duration, ease: 'easeInOut', repeat: Infinity, delay: wave.delay }}
-          className="absolute h-[46%] w-[138%] max-w-none object-contain object-bottom"
+          className="absolute z-20 h-[46%] w-[138%] max-w-none object-contain object-bottom"
           style={{ bottom: wave.bottom, scale: wave.scale }}
         />
       ))}
       <motion.img
         src="/art/lantern-boat.png"
         alt=""
-        initial={reduceMotion ? false : { opacity: 0, x: '120vw', y: 25, rotate: 8 }}
-        animate={reduceMotion ? { opacity: 1, x: 0, y: 0 } : { opacity: 1, x: ['120vw', '7vw', '11vw', '7vw'], y: [25, 0, -14, 0], rotate: [8, -3, 2, -3] }}
+        initial={reduceMotion ? false : { x: '120vw', y: 25, rotate: 8 }}
+        animate={reduceMotion ? { x: 0, y: 0 } : { x: ['120vw', '7vw', '11vw', '7vw'], y: [25, 0, -14, 0], rotate: [8, -3, 2, -3] }}
         transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-[8%] right-[10%] w-[min(36vw,29rem)] drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)]"
-      />
-      <motion.img
-        src="/art/portal-garden.png"
-        alt=""
-        initial={reduceMotion ? false : { opacity: 0, y: '105vh', rotate: -2 }}
-        animate={reduceMotion ? { opacity: 1, y: 0, rotate: 0 } : { opacity: [0, 1, 1], y: ['105vh', '0vh', '-1vh'], rotate: [-2, 0, 1] }}
-        transition={{ duration: 16, ease: 'easeOut' }}
-        className="absolute -bottom-[3%] -right-[5%] w-[min(48vw,43rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
+        className="absolute bottom-[8%] right-[10%] z-30 w-[min(36vw,29rem)] drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)]"
       />
     </div>
   )
