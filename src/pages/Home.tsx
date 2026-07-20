@@ -14,8 +14,6 @@ export function Home() {
   return (
     <main className="joy-landing relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#281941] px-6 py-12">
       <LayeredLanding />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(30,16,58,0.92)_0%,rgba(38,20,64,0.68)_43%,rgba(26,13,49,0.12)_100%)]" />
-      <div className="joy-paper-grain absolute inset-0 -z-10" aria-hidden="true" />
 
       <section className="w-full max-w-5xl text-center sm:text-left">
         <motion.p
@@ -82,18 +80,18 @@ function LayeredLanding() {
       <motion.img
         src="/art/painted-stars.png"
         alt=""
-        initial={reduceMotion ? false : { y: '-24vh', scale: 0.82 }}
-        animate={reduceMotion ? { y: 0, scale: 1 } : { y: ['-24vh', '0vh', '-1vh'], scale: [0.82, 1, 1] }}
-        transition={{ duration: 6, ease: 'easeOut' }}
+        initial={reduceMotion ? false : { y: '-10vh', scale: 0.9 }}
+        animate={reduceMotion ? { y: 0, scale: 1 } : { y: ['-10vh', '0vh', '-1vh'], scale: [0.9, 1, 1] }}
+        transition={{ duration: 2.4, ease: 'easeOut' }}
         className="absolute top-[2%] left-[28%] h-[42%] w-[66%] max-w-none object-contain object-top"
       />
       <motion.img
         src="/art/crescent-moon.png"
         alt=""
-        initial={reduceMotion ? false : { y: '-32vh', rotate: -10 }}
-        animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['-32vh', '0vh', '-1vh'], rotate: [-10, 0, 1] }}
-        transition={{ duration: 5.5, ease: 'easeOut', delay: 0.2 }}
-        className="absolute top-[5%] right-[12%] z-10 h-[27%] w-[27%] max-w-[23rem] object-contain object-top drop-shadow-[0_0_38px_rgba(255,225,148,0.38)]"
+        initial={reduceMotion ? false : { y: '-14vh', rotate: -7 }}
+        animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['-14vh', '0vh', '-1vh'], rotate: [-7, 0, 1] }}
+        transition={{ duration: 2.6, ease: 'easeOut', delay: 0.1 }}
+        className="absolute top-[4%] right-[9%] z-10 h-[30%] w-[30%] max-w-[25rem] object-contain object-top drop-shadow-[0_0_38px_rgba(255,225,148,0.38)]"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
@@ -101,7 +99,7 @@ function LayeredLanding() {
         initial={reduceMotion ? false : { x: '100vw' }}
         animate={reduceMotion ? { x: 0 } : { x: ['100vw', '0vw'], y: ['-5vh', '0vh'] }}
         transition={{ duration: 9, ease: 'easeOut' }}
-        className="absolute top-[5%] right-[3%] h-[34%] w-[78%] max-w-[72rem] object-contain object-top"
+        className="absolute top-[14%] right-[3%] h-[29%] w-[76%] max-w-[72rem] object-contain object-top"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
@@ -109,7 +107,7 @@ function LayeredLanding() {
         initial={reduceMotion ? false : { x: '-100vw' }}
         animate={reduceMotion ? { x: 0 } : { x: ['-100vw', '0vw'], y: [0, '-2vh'] }}
         transition={{ duration: 10, ease: 'easeOut', delay: 0.4 }}
-        className="absolute top-[28%] left-[0%] h-[30%] w-[78%] max-w-[72rem] object-contain object-left"
+        className="absolute top-[36%] left-[0%] h-[24%] w-[70%] max-w-[72rem] object-contain object-left"
       />
       <motion.img
         src="/art/dusk-cloud-bank.png"
@@ -117,7 +115,7 @@ function LayeredLanding() {
         initial={reduceMotion ? false : { x: '100vw' }}
         animate={reduceMotion ? { x: 0 } : { x: ['100vw', '0vw'], y: ['2vh', '0vh'] }}
         transition={{ duration: 11, ease: 'easeOut', delay: 0.7 }}
-        className="absolute top-[43%] right-[0%] h-[25%] w-[70%] max-w-[64rem] scale-x-[-1] object-contain object-right"
+        className="absolute top-[50%] right-[0%] h-[19%] w-[58%] max-w-[64rem] scale-x-[-1] object-contain object-right"
       />
       <motion.img
         src="/art/portal-garden.png"
@@ -125,7 +123,7 @@ function LayeredLanding() {
         initial={reduceMotion ? false : { y: '105vh', rotate: -2 }}
         animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['105vh', '0vh', '-1vh'], rotate: [-2, 0, 1] }}
         transition={{ duration: 10, ease: 'easeOut', delay: 1 }}
-        className="absolute bottom-[12%] right-[3%] z-10 w-[min(38vw,35rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
+        className="absolute bottom-[24%] right-[6%] z-10 w-[min(34vw,31rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
       />
       {[{ bottom: '-4%', duration: 24, delay: -3, scale: 1.15 }, { bottom: '-13%', duration: 30, delay: -13, scale: 1.34 }, { bottom: '-22%', duration: 36, delay: -21, scale: 1.58 }].map((wave, index) => (
         <motion.img
