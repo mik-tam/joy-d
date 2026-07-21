@@ -24,7 +24,10 @@ export function generateSceneImages(capsule: JoyCapsule): Promise<WorldSceneImag
           worldName: capsule.worldName,
           look: capsule.visualDirection,
           backdrop: scene.backdrop,
-          elements: scene.elements.map((element) => element.description),
+          elements: scene.elements.map((element) => ({
+            description: element.description,
+            sprite: element.sprite,
+          })),
         }),
       })
       if (!response.ok) return null

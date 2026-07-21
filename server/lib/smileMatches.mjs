@@ -5,11 +5,19 @@
 // summaries—never camera frames, landmarks, names, accounts, or locations.
 
 const matchShapes = ['Gentle Bloom', 'Bright Spark', 'Slow Sunrise']
+const sceneSprites = ['lantern-boat', 'crescent-moon', 'garden-door', 'cloud', 'wave', 'star']
 const profileTtlMs = 7 * 24 * 60 * 60 * 1000
 const tableName = 'joyd_match_profiles'
 
 function isSafeSessionId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9-]{12,80}$/.test(value)
+}
+
+function isSafeWorld(world) {
+  return world && typeof world === 'object'
+    && typeof world.worldName === 'string' && world.worldName.length > 0 && world.worldName.length <= 120
+    && typeof world.quote === 'string' && world.quote.length > 0 && world.quote.length <= 420
+    && (world.sprite == null || sceneSprites.includes(world.sprite))
 }
 
 function isSafeMatchRequest(value) {
@@ -23,16 +31,23 @@ function isSafeMatchRequest(value) {
     && Number.isInteger(signature.signalPercent)
     && signature.signalPercent >= 0
     && signature.signalPercent <= 100
+    && Number.isInteger(signature.heldForMs)
+    && signature.heldForMs >= 0
+    && signature.heldForMs <= 8000
+    && typeof signature.riseRate === 'number'
+    && signature.riseRate >= 0
+    && signature.riseRate <= 3
+    && typeof signature.momentCode === 'string'
+    && /^JOY-[A-Z0-9]{3,8}$/.test(signature.momentCode)
+    && typeof signature.wonderTitle === 'string'
+    && signature.wonderTitle.length > 0
+    && signature.wonderTitle.length <= 80
     && Array.isArray(signature.colorTrail)
     && signature.colorTrail.length === 3
     && signature.colorTrail.every((color) => typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color))
     && Array.isArray(worlds)
     && worlds.length === 3
-    && worlds.every(
-      (world) => world && typeof world === 'object'
-        && typeof world.worldName === 'string' && world.worldName.length > 0 && world.worldName.length <= 120
-        && typeof world.quote === 'string' && world.quote.length > 0 && world.quote.length <= 420,
-    )
+    && worlds.every(isSafeWorld)
 }
 
 function matchScore(first, second) {
@@ -67,7 +82,28 @@ async function supabaseRequest(config, path, options = {}) {
 }
 
 function normalizeWorlds(worlds) {
-  return worlds.map(({ worldName, quote }) => ({ worldName, quote }))
+  return worlds.map(({ worldName, quote, sprite }) => ({
+    worldName,
+    quote,
+    ...(sceneSprites.includes(sprite) ? { sprite } : {}),
+  }))
+}
+
+function profileToTraveler(profile) {
+  return {
+    shape: profile.shape,
+    signalPercent: profile.signal_percent,
+    colorTrail: profile.color_trail,
+    heldForMs: Number.isInteger(profile.held_for_ms) ? profile.held_for_ms : 700,
+    riseRate: typeof profile.rise_rate === 'number' ? profile.rise_rate : 0.35,
+    momentCode: typeof profile.moment_code === 'string' && profile.moment_code.startsWith('JOY-')
+      ? profile.moment_code
+      : `JOY-${String(profile.signal_percent ?? 0).padStart(2, '0')}X`,
+    wonderTitle: typeof profile.wonder_title === 'string' && profile.wonder_title
+      ? profile.wonder_title
+      : 'A fellow traveler',
+    worlds: normalizeWorlds(Array.isArray(profile.worlds) ? profile.worlds : []),
+  }
 }
 
 function validProfiles(value) {
@@ -100,6 +136,10 @@ export async function handleSmileMatchRequest(requestBody) {
     shape: signature.shape,
     signalPercent: signature.signalPercent,
     colorTrail: signature.colorTrail,
+    heldForMs: signature.heldForMs,
+    riseRate: signature.riseRate,
+    momentCode: signature.momentCode,
+    wonderTitle: signature.wonderTitle,
     worlds: normalizeWorlds(worlds),
   }
 
@@ -114,7 +154,7 @@ export async function handleSmileMatchRequest(requestBody) {
 
     const candidatesResponse = await supabaseRequest(
       config,
-      `${tableName}?session_id=neq.${encodeURIComponent(clientSessionId)}&expires_at=gt.${encodeURIComponent(now.toISOString())}&select=shape,signal_percent,color_trail,worlds&order=created_at.desc&limit=48`,
+      `${tableName}?session_id=neq.${encodeURIComponent(clientSessionId)}&expires_at=gt.${encodeURIComponent(now.toISOString())}&select=shape,signal_percent,color_trail,worlds,moment_code,wonder_title,held_for_ms,rise_rate&order=created_at.desc&limit=48`,
     )
     const candidates = validProfiles(await candidatesResponse.json())
 
@@ -130,6 +170,10 @@ export async function handleSmileMatchRequest(requestBody) {
         signal_percent: currentTraveler.signalPercent,
         color_trail: currentTraveler.colorTrail,
         worlds: currentTraveler.worlds,
+        moment_code: currentTraveler.momentCode,
+        wonder_title: currentTraveler.wonderTitle,
+        held_for_ms: currentTraveler.heldForMs,
+        rise_rate: currentTraveler.riseRate,
         created_at: now.toISOString(),
         expires_at: new Date(now.getTime() + profileTtlMs).toISOString(),
       }),
@@ -155,18 +199,23 @@ export async function handleSmileMatchRequest(requestBody) {
       }),
     }).profile
 
-    const matchedTraveler = {
-      shape: match.shape,
-      signalPercent: match.signal_percent,
-      colorTrail: match.color_trail,
-    }
+    const matchedTraveler = profileToTraveler(match)
 
     return {
       status: 200,
       body: {
         matchSource: 'live',
         matchColorTrail: matchedTraveler.colorTrail,
-        matchWorlds: normalizeWorlds(match.worlds),
+        matchWorlds: matchedTraveler.worlds,
+        matchSignature: {
+          colorTrail: matchedTraveler.colorTrail,
+          heldForMs: matchedTraveler.heldForMs,
+          momentCode: matchedTraveler.momentCode,
+          riseRate: matchedTraveler.riseRate,
+          shape: matchedTraveler.shape,
+          signalPercent: matchedTraveler.signalPercent,
+          wonderTitle: matchedTraveler.wonderTitle,
+        },
         sharedShape: matchedTraveler.shape,
         similarity: Math.round(72 + matchScore(currentTraveler, matchedTraveler) * 26),
       },

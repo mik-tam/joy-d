@@ -8,7 +8,8 @@ import {
   JoyCapsuleError,
   type JoyCapsule,
 } from '../../data/joyCapsule'
-import { findSmileMatch, SmileMatchError, type SmileMatch } from '../../data/smileMatch'
+import { findSmileMatch, SmileMatchError, type MatchWorldSummary, type SmileMatch } from '../../data/smileMatch'
+import { resolveScene } from '../../data/joyScene'
 import { saveVoyage } from '../../data/joyJournal'
 import { shareJoyStoryCard } from '../../data/joyStoryCard'
 import { generateSceneImages, generateSurpriseImage, type WorldSceneImages } from '../../data/joySceneImages'
@@ -401,7 +402,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             ) : (
               <>
                 <p className="text-xs font-bold tracking-[0.3em] text-amber-100/75">
-                  {discoveryNumber === 1 ? 'THE FIRST LITTLE DOOR' : `DISCOVERY ${discoveryNumber}`} · DOOR {discoveryNumber} OF 3
+                  DOOR {discoveryNumber} of 3
                 </p>
                 <h1 id="portal-title" className="mt-3 font-serif text-4xl font-black tracking-[-0.04em] text-white sm:text-5xl">
                   {activeCapsule.worldName}
@@ -456,7 +457,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             className="pointer-events-none absolute inset-x-0 top-14 z-30 mx-auto max-w-2xl px-14 text-center sm:top-12 sm:px-16"
           >
             <p className="text-[10px] font-bold tracking-[0.3em] text-white/70 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]">
-              DOOR {discoveryNumber} OF 3
+              DOOR {discoveryNumber} of 3
             </p>
             <h1 id="portal-title" className="mt-1 font-serif text-3xl font-black tracking-[-0.04em] text-white drop-shadow-[0_2px_14px_rgba(9,4,25,0.7)] sm:text-4xl">
               {activeCapsule.worldName}
@@ -1068,25 +1069,94 @@ function MeetBurst() {
   )
 }
 
-function WorldMatchList({
+const spriteMarks: Record<string, string> = {
+  'lantern-boat': '◈',
+  'crescent-moon': '☾',
+  'garden-door': '⌂',
+  cloud: '◌',
+  wave: '〰',
+  star: '✦',
+}
+
+function TravelerFlipCard({
   label,
+  signature,
   worlds,
+  worldImages,
+  reduceMotion,
 }: {
   label: string
-  worlds: Array<{ quote: string; worldName: string }>
+  signature: JoySignature
+  worlds: MatchWorldSummary[]
+  worldImages?: Record<string, WorldSceneImages>
+  reduceMotion: boolean
 }) {
+  const [flipped, setFlipped] = useState(false)
+
   return (
-    <section className="rounded-2xl border border-white/12 bg-white/5 p-3">
-      <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
-      <ol className="mt-2 grid gap-2">
-        {worlds.map((world, index) => (
-          <li key={`${world.worldName}-${index}`}>
-            <p className="font-serif text-xs font-black leading-tight text-white">{world.worldName}</p>
-            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/50">“{world.quote}”</p>
-          </li>
-        ))}
-      </ol>
-    </section>
+    <button
+      type="button"
+      onClick={() => setFlipped((current) => !current)}
+      aria-pressed={flipped}
+      aria-label={flipped ? `${label}: show signature` : `${label}: show three worlds`}
+      className="group relative h-[19.5rem] w-full [perspective:1100px] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/50"
+    >
+      <motion.div
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={{ duration: reduceMotion ? 0 : 0.55, ease: 'easeInOut' }}
+        className="relative h-full w-full [transform-style:preserve-3d]"
+      >
+        {/* Signature composition side (shown first). */}
+        <div className="absolute inset-0 flex flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
+            <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
+          </div>
+          <div className="mt-2 flex items-center gap-2.5">
+            <JoyPrint signature={signature} className="size-11 shrink-0" />
+            <div className="min-w-0">
+              <p className="truncate font-serif text-sm font-black leading-tight text-white">{signature.wonderTitle}</p>
+              <p className="text-[10px] text-white/55">{signature.shape}</p>
+            </div>
+          </div>
+          <div className="mt-3 grid flex-1 gap-1.5">
+            <StoryStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
+            <StoryStat label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 4000) * 100} />
+            <StoryStat label="BLOOM" value={bloomLabel(signature.riseRate)} percent={(signature.riseRate / 1) * 100} />
+          </div>
+          <p className="mt-2 text-center text-[9px] text-white/35">tap to see worlds</p>
+        </div>
+
+        {/* Worlds side. */}
+        <div className="absolute inset-0 flex rotate-y-180 flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
+          <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label} · 3 WORLDS</p>
+          <ol className="mt-2 grid flex-1 gap-2">
+            {worlds.slice(0, 3).map((world, index) => {
+              const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
+              const mark = spriteMarks[world.sprite ?? ''] ?? '✦'
+              return (
+                <li key={`${world.worldName}-${index}`} className="flex items-center gap-2">
+                  <div className="relative size-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                    {image ? (
+                      <img src={image} alt="" className="h-full w-full object-contain p-0.5" />
+                    ) : (
+                      <span className="grid h-full place-items-center text-base text-amber-100/80" aria-hidden="true">
+                        {mark}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-serif text-[11px] font-black leading-tight text-white">{world.worldName}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[9px] leading-snug text-white/45">“{world.quote}”</p>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+          <p className="mt-1 text-center text-[9px] text-white/35">tap to see signature</p>
+        </div>
+      </motion.div>
+    </button>
   )
 }
 
@@ -1140,7 +1210,20 @@ function SmileStory({
     setMatchStatus('searching')
     try {
       const [result] = await Promise.all([
-        findSmileMatch(signature, capsules.map(({ quote, worldName }) => ({ quote, worldName }))),
+        findSmileMatch(
+          signature,
+          capsules.map((capsule) => {
+            const scene = resolveScene(capsule)
+            const sprite =
+              scene.elements.find((element) => element.sprite !== 'garden-door')?.sprite
+              ?? scene.elements[0]?.sprite
+            return {
+              quote: capsule.quote,
+              worldName: capsule.worldName,
+              ...(sprite ? { sprite } : {}),
+            } satisfies MatchWorldSummary
+          }),
+        ),
         delay(reduceMotion ? 300 : 1800),
       ])
       if (result.matchSource === 'waiting') {
@@ -1198,18 +1281,29 @@ function SmileStory({
   }
 
   const otherSignature: JoySignature | null = match?.matchSource === 'live'
-    ? {
-        colorTrail: ((match.matchColorTrail?.length ?? 0) >= 3
-          ? match.matchColorTrail!.slice(0, 3)
-          : ['#f7b7d7', '#a9dfff', '#fff0a8']) as [string, string, string],
-        creativeSeed: (match.similarity ?? 0) * 97,
-        heldForMs: 700 + (match.similarity ?? 0) * 7,
-        momentCode: `JOY-${(match.sharedShape ?? 'JOY').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity ?? 0}`,
-        riseRate: 0.4,
-        shape: match.sharedShape ?? 'Gentle Bloom',
-        signalPercent: match.similarity ?? 0,
-        wonderTitle: 'A fellow traveler',
-      }
+    ? match.matchSignature
+      ? {
+          colorTrail: match.matchSignature.colorTrail,
+          creativeSeed: (match.similarity ?? 0) * 97,
+          heldForMs: match.matchSignature.heldForMs,
+          momentCode: match.matchSignature.momentCode,
+          riseRate: match.matchSignature.riseRate,
+          shape: match.matchSignature.shape,
+          signalPercent: match.matchSignature.signalPercent,
+          wonderTitle: match.matchSignature.wonderTitle,
+        }
+      : {
+          colorTrail: ((match.matchColorTrail?.length ?? 0) >= 3
+            ? match.matchColorTrail!.slice(0, 3)
+            : ['#f7b7d7', '#a9dfff', '#fff0a8']) as [string, string, string],
+          creativeSeed: (match.similarity ?? 0) * 97,
+          heldForMs: 700 + (match.similarity ?? 0) * 7,
+          momentCode: `JOY-${(match.sharedShape ?? 'JOY').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity ?? 0}`,
+          riseRate: 0.4,
+          shape: match.sharedShape ?? 'Gentle Bloom',
+          signalPercent: match.similarity ?? 0,
+          wonderTitle: 'A fellow traveler',
+        }
     : null
 
   const chapters = ['Journey', 'Worlds', 'Signature', 'Connection']
@@ -1247,7 +1341,7 @@ function SmileStory({
         ))}
       </div>
 
-      <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-6 py-4">
+      <div className={`relative z-10 flex flex-1 items-center justify-center overflow-y-auto py-4 ${chapter === 1 ? 'px-0' : 'px-6'}`}>
         <AnimatePresence mode="wait">
           {/* ---------------------------------------------------------------- */}
           {chapter === 0 && (
@@ -1289,10 +1383,10 @@ function SmileStory({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.5, ease: 'easeOut' }}
-              className="flex w-full max-w-3xl flex-col items-center"
+              className="flex w-full max-w-none flex-col items-center"
             >
-              <p className="text-xs font-bold tracking-[0.3em] text-amber-100/80">THE PLACES YOUR SMILE OPENED</p>
-              <div className="mt-6 flex w-full snap-x gap-4 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:justify-center">
+              <p className="px-6 text-xs font-bold tracking-[0.3em] text-amber-100/80">THE PLACES YOUR SMILE OPENED</p>
+              <div className="mt-6 flex w-full snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:justify-center sm:gap-4 sm:px-6">
                 {capsules.map((capsule, index) => {
                   const images = worldImages[capsule.worldName]
                   const sprite = images?.elements.find(Boolean) ?? null
@@ -1303,7 +1397,7 @@ function SmileStory({
                       initial={reduceMotion ? false : { opacity: 0, y: 20, scale: 0.94 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ delay: 0.15 + index * 0.16, duration: 0.55, ease: 'easeOut' }}
-                      className={`relative flex aspect-[3/4] w-[min(66vw,14rem)] shrink-0 snap-center flex-col justify-end overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${worldFallbackGradients[index % 3]} shadow-2xl shadow-black/50`}
+                      className={`relative flex aspect-[3/4] w-[min(78vw,16rem)] shrink-0 snap-center flex-col justify-end overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${worldFallbackGradients[index % 3]} shadow-2xl shadow-black/50 sm:w-[min(66vw,14rem)]`}
                     >
                       {images?.backdrop && (
                         <img src={images.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -1333,7 +1427,7 @@ function SmileStory({
                   )
                 })}
               </div>
-              <p className="mt-5 text-center text-sm text-white/60">
+              <p className="mt-5 px-6 text-center text-sm text-white/60">
                 {wondersRevealed.size === capsules.length
                   ? 'You uncovered every hidden wonder. ✦'
                   : `${wondersRevealed.size} of ${capsules.length} hidden wonders uncovered.`}
@@ -1442,10 +1536,32 @@ function SmileStory({
                     {match.similarity ?? 0}%
                   </motion.p>
                   <p className="text-xs font-semibold tracking-[0.2em] text-amber-100/70">JOY:D RESONANCE</p>
-                  <div className="mt-5 grid w-full max-w-sm grid-cols-2 gap-3 text-left">
-                    <WorldMatchList label="YOUR THREE WORLDS" worlds={capsules} />
-                    <WorldMatchList label="THEIR THREE WORLDS" worlds={match.matchWorlds ?? []} />
+                  <div className="mt-5 grid w-full max-w-lg grid-cols-2 gap-2.5 sm:gap-3">
+                    <TravelerFlipCard
+                      label="YOU"
+                      signature={signature}
+                      worlds={capsules.map((capsule) => {
+                        const scene = resolveScene(capsule)
+                        const sprite =
+                          scene.elements.find((element) => element.sprite !== 'garden-door')?.sprite
+                          ?? scene.elements[0]?.sprite
+                        return {
+                          quote: capsule.quote,
+                          worldName: capsule.worldName,
+                          ...(sprite ? { sprite } : {}),
+                        }
+                      })}
+                      worldImages={worldImages}
+                      reduceMotion={Boolean(reduceMotion)}
+                    />
+                    <TravelerFlipCard
+                      label="THEM"
+                      signature={otherSignature}
+                      worlds={match.matchWorlds ?? []}
+                      reduceMotion={Boolean(reduceMotion)}
+                    />
                   </div>
+                  <p className="mt-3 text-[10px] text-white/40">Tap a card to flip between signatures and worlds.</p>
                   <p className="mt-4 max-w-xs text-xs leading-relaxed text-white/45">
                     A real anonymous traveler. Only your playful signature and AI-generated world summaries met here—never either person’s identity.
                   </p>
