@@ -65,6 +65,7 @@ export class JoyCapsuleError extends Error {
 export async function generateJoyCapsule(
   signature: JoySignature,
   previousWorldNames: string[] = [],
+  unlockPulse = signature.signalPercent,
 ): Promise<JoyCapsule> {
   let response: Response
 
@@ -75,8 +76,10 @@ export async function generateJoyCapsule(
       body: JSON.stringify({
         signature: {
           colorTrail: signature.colorTrail,
+          creativeSeed: signature.creativeSeed,
           shape: signature.shape,
           signalPercent: signature.signalPercent,
+          unlockPulse: Math.round(Math.min(Math.max(unlockPulse, 0), 100)),
           wonderTitle: signature.wonderTitle,
         },
         previousWorldNames,

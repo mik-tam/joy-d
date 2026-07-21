@@ -20,8 +20,8 @@ function isSafeSceneImageRequest(value) {
     )
 }
 
-// Generates the world's visuals from the story itself: transparent watercolor
-// sprites for each cast element plus a distant backdrop, style-locked to the
+// Generates the world's visuals from the story itself: transparent sprites
+// for each cast element plus a distant backdrop, style-locked to the
 // capsule's LOOK direction. Prompts contain only AI-generated story text —
 // never anything from the camera. OpenRouter takes priority when configured,
 // matching the text provider; OpenAI is used directly otherwise.
@@ -48,7 +48,7 @@ export async function handleJoySceneRequest(requestBody) {
     : process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 90_000)
-  const styleLock = 'Whimsical storybook watercolor illustration, soft painted texture, gentle gold accents, dreamlike and kind. No text, no words, no watermark.'
+  const imageConstraints = 'Create original artwork. Follow the supplied LOOK exactly; do not fall back to a generic pastel watercolor or childlike storybook look unless LOOK explicitly asks for it. No text, no words, no lettering, no watermark, no border, and no copyrighted characters or brands.'
 
   const generateViaOpenRouter = async (prompt, { size, transparent }) => {
     const result = await fetch('https://openrouter.ai/api/v1/images', {
@@ -113,13 +113,13 @@ export async function handleJoySceneRequest(requestBody) {
     const [backdropImage, ...elementImages] = await Promise.all([
       backdrop
         ? generateOne(
-            `${backdrop}. Distant dreamy scenery filling the whole frame, soft gradients, nothing in sharp focus. ${styleLock} Palette and mood: ${look}`,
+            `${backdrop}. A full-frame environmental composition with depth and a readable focal space. ${imageConstraints} LOOK: ${look}`,
             { size: '1536x1024', transparent: false },
           )
         : Promise.resolve(null),
       ...cappedElements.map((description) =>
         generateOne(
-          `${description}. A single isolated subject, centered, on a fully transparent background. No ground, no shadow, no background scenery, no border. ${styleLock} Palette and mood: ${look}`,
+          `${description}. A single isolated subject, centered, on a fully transparent background. No ground, no shadow, no background scenery, no border. ${imageConstraints} LOOK: ${look}`,
           { size: '1024x1024', transparent: true },
         ),
       ),

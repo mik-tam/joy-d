@@ -15,6 +15,12 @@ function isSafeSignature(value) {
   if (!Number.isInteger(value.signalPercent) || value.signalPercent < 0 || value.signalPercent > 100) {
     return false
   }
+  if (!Number.isInteger(value.creativeSeed) || value.creativeSeed < 0 || value.creativeSeed > 4_294_967_295) {
+    return false
+  }
+  if (!Number.isInteger(value.unlockPulse) || value.unlockPulse < 0 || value.unlockPulse > 100) {
+    return false
+  }
   return Array.isArray(value.colorTrail) && value.colorTrail.length === 3 && value.colorTrail.every(
     (color) => typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color),
   )
@@ -167,10 +173,40 @@ const capsuleSchema = {
 }
 
 const depthBriefs = [
-  'This is the first door: a gentle, welcoming wonder. One or two things are quietly impossible.',
-  'This is the second door, stranger and deeper: scale starts to break. Something enormous drifts where it cannot be, something tiny holds something huge.',
-  'This is the third door, deeper than most travelers ever go: fully impossible. Invert sky and sea, let the colossal and the tiny trade places, put the door itself somewhere doors never stand.',
+  'This is the first door: an inviting but visually distinctive world. One or two things are quietly impossible.',
+  'This is the second door: stranger, bolder, and unlike the first. Scale starts to break; something enormous drifts where it cannot be, and something tiny holds something huge.',
+  'This is the third door: fully impossible and visually surprising. Invert sky and sea, let the colossal and tiny trade places, and put the door itself somewhere doors never stand.',
 ]
+
+const worldArtProfiles = [
+  'graphic-novel garden — bold ink contours, rich flat color fields, halftone texture, theatrical shadows, and a sharp poster-like composition',
+  'nocturnal surrealism — inky indigo and bruised violet, strange adult fairy-tale imagery, fine etched details, and isolated pools of moonlit color',
+  'luminous risograph collage — misregistered blocks of coral, cobalt, and moss, cut-paper shapes, visible print grain, playful but graphic',
+  'mythic natural-history plate — weathered pigment, precise odd creatures, antique specimen labels implied only through composition, mossy shadow, and a quiet uncanny mood',
+  'psychedelic geometric dream — saturated jewel colors, looping symbolic forms, crisp graphic silhouettes, asymmetrical framing, and energetic visual rhythm',
+  'charcoal-and-pastel night theatre — smoky black paper, chalky constellations, warm spotlights, oversized props, and a tender but grown-up sense of mystery',
+  'folk-art tapestry — embroidered lines, dense ornament, jewel-toned textile texture, flattened perspective, and strange ceremonial creatures',
+  'sun-bleached surreal travel poster — wide negative space, warm mineral colors, dramatic architecture, and one impossible focal object',
+  'deep-sea ink fable — green-black water, phosphorescent accents, delicate crosshatching, drifting biological forms, and eerie calm',
+  'softly painted cloud dream — translucent washes, pale lavender and peach light, delicate hand-painted texture, and a gentle impossible landscape',
+  'midnight paper-cut diorama — layered silhouettes, razor-edged shapes, electric accent colors, deep shadows, and a cinematic, slightly unsettling depth',
+]
+
+function artDirectionFor(signature, worldDepth) {
+  // First, second, and third doors come from non-overlapping groups. The live
+  // unlock pulse nudges the selection within each group, so the held smile
+  // enriches the creative signature without transmitting face data.
+  const pulseVariant = signature.unlockPulse >= 68 ? 1 : 0
+  const depthOffset = [0, 3, 6][Math.min(worldDepth, 2)]
+  const profile = worldArtProfiles[(signature.creativeSeed + depthOffset + pulseVariant) % worldArtProfiles.length]
+  const energy =
+    signature.unlockPulse >= 82
+      ? 'Make the composition high-energy and radiant.'
+      : signature.unlockPulse <= 55
+        ? 'Make the composition quieter, darker, and more spacious.'
+        : 'Balance luminous detail with a calm, surprising composition.'
+  return `${profile}. ${energy}`
+}
 
 // Returns { status, body } — never throws — so both the Express route and the
 // Vercel function can respond identically with `response.status(status).json(body)`.
@@ -191,15 +227,18 @@ export async function handleJoyCapsuleRequest(requestBody) {
   }
 
   try {
+    const worldDepth = previousWorldNames.length
+    const artDirection = artDirectionFor(signature, worldDepth)
     const systemPrompt = [
       'You create one whimsical JOY:D joy capsule. Treat the supplied signature as a creative style cue, never a measure of identity, emotion, or psychology.',
-      'Write with warm oddity: a little Ghibli warmth, curious storybook details, and surprising but gentle imagery. No copyrighted characters, no brands, no claims about the person.',
-      'You also cast the visible scene. Every element gets a `description`: a vivid 8-20 word visual description of that exact thing as it appears in THIS story, weaving in the palette from visualDirection (for example: "a miniature wooden boat with one glowing amber lantern sailing a river of lavender mist"). The scene `backdrop` is one sentence describing the distant scenery of this world. Also pick each element\'s closest stand-in `sprite` from the kit: lantern-boat, crescent-moon, garden-door, cloud, wave, star. Sizes: tiny, small, grand, colossal. Motions: drift, bob, spin-slow, float, still. Positions are percentages (x 0-100 left-to-right, y 0-100 top-to-bottom).',
-      'Cast 3 to 6 elements and compose them like a picture-book dream: put familiar things at impossible scales in impossible places — a colossal moon resting low, a boat sailing high among clouds, waves rolling across the top of the sky, a tiny door far from any wall, small travelers stepping off clouds. The story, the descriptions, and the scene must clearly belong to the same world.',
-      'Spread the elements across the whole frame like a well-composed picture book spread: two elements may overlap slightly to create depth, but every element must remain clearly visible on its own.',
+      'Create original visual language. Never imitate a named artist, studio, franchise, character, or brand. Do not default to pastel watercolor, crescent moons, little girls, clouds, lantern boats, or a childlike storybook look unless the supplied art direction specifically calls for them.',
+      `The required art direction for this door is: ${artDirection} The returned visualDirection MUST state and preserve this direction clearly; it controls every generated image in this world.`,
+      'You also cast the visible scene. Every element gets a `description`: a vivid 8-20 word visual description of that exact thing as it appears in THIS story, weaving in the palette and art direction from visualDirection. The scene `backdrop` is one sentence describing the distant scenery of this world. Pick each element\'s closest stand-in `sprite` from the kit: lantern-boat, crescent-moon, garden-door, cloud, wave, star. These are interaction stand-ins, not a requirement to include their literal subject. Sizes: tiny, small, grand, colossal. Motions: drift, bob, spin-slow, float, still. Positions are percentages (x 0-100 left-to-right, y 0-100 top-to-bottom).',
+      'Cast 3 to 6 elements and compose an original scene with impossible scale, depth, and a clear focal point. The story, descriptions, and scene must clearly belong to the same world.',
+      'Spread elements across the whole frame: two may overlap slightly for depth, but every element must remain clearly visible on its own.',
       'Return only the requested JSON.',
     ].join(' ')
-    const depthBrief = depthBriefs[Math.min(previousWorldNames.length, depthBriefs.length - 1)]
+    const depthBrief = depthBriefs[Math.min(worldDepth, depthBriefs.length - 1)]
     const previousWorldInstruction = previousWorldNames.length
       ? ` It must feel distinctly new and must not reuse these earlier world names: ${JSON.stringify(previousWorldNames)}.`
       : ''

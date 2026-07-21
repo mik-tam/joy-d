@@ -111,7 +111,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
     setIsDeepening(true)
     setDeepeningError(null)
     try {
-      const nextCapsule = await generateJoyCapsule(signature, capsules.map(({ worldName }) => worldName))
+      // Each later door carries the live held smile into its creative cue.
+      // This stays a coarse, non-identifying percentage in the browser-to-
+      // server payload; frames and landmarks never leave the device.
+      const unlockPulse = Math.round(Math.min(Math.max(smileScoreRef.current, 0), 1) * 100)
+      const nextCapsule = await generateJoyCapsule(signature, capsules.map(({ worldName }) => worldName), unlockPulse)
       setCapsules((current) => [...current, nextCapsule])
       setActiveCapsuleIndex(capsules.length)
     } catch (error) {
@@ -1126,6 +1130,7 @@ function SmileStory({
         colorTrail: (match.matchColorTrail.length >= 3
           ? match.matchColorTrail.slice(0, 3)
           : ['#f7b7d7', '#a9dfff', '#fff0a8']) as [string, string, string],
+        creativeSeed: match.similarity * 97,
         heldForMs: 700 + match.similarity * 7,
         momentCode: `JOY-${match.sharedShape.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity}`,
         riseRate: 0.4,
