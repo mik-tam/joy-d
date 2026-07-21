@@ -44,10 +44,12 @@ const sceneSprites = ['lantern-boat', 'crescent-moon', 'garden-door', 'cloud', '
 const sceneSizes = ['tiny', 'small', 'grand', 'colossal']
 const sceneMotions = ['drift', 'bob', 'spin-slow', 'float', 'still']
 
-const spriteRadius = { tiny: 5, small: 9, grand: 16, colossal: 24 }
 // Approximate half-width of each size in stage percentage units: the bigger a
 // sprite, the further its center must stay from the edges so it never crops
-// into illegibility (colossal pieces are pulled toward center stage).
+// into illegibility (colossal pieces are pulled toward center stage). This is
+// also the true rendered footprint (see spriteWidths in WorldStage.tsx, which
+// maps to roughly these same percentages of the viewport), so it's the right
+// number to use for keeping two sprites from visually swallowing each other.
 const spriteFootprint = { tiny: 5, small: 9, grand: 17, colossal: 29 }
 
 function clampSceneElement(element) {
@@ -81,7 +83,11 @@ function spreadSceneElements(elements) {
     let moved = false
     for (let a = 0; a < placed.length; a += 1) {
       for (let b = a + 1; b < placed.length; b += 1) {
-        const minDistance = (spriteRadius[placed[a].size] + spriteRadius[placed[b].size]) * 0.62
+        // Using the real footprint (not a smaller abstract "collision radius")
+        // is what previously let colossal/grand pairs land almost on top of
+        // each other — their true rendered half-widths summed to far more
+        // than the old radius-based minimum ever enforced.
+        const minDistance = (spriteFootprint[placed[a].size] + spriteFootprint[placed[b].size]) * 0.72
         let dx = placed[b].x - placed[a].x
         let dy = placed[b].y - placed[a].y
         let distance = Math.hypot(dx, dy)
@@ -357,7 +363,7 @@ export async function handleJoyCapsuleRequest(requestBody) {
       'Create original visual language. Never imitate a named artist, studio, franchise, character, or brand. Follow the supplied art direction exactly — including when it asks for dreamy pastel watercolor, soft light, or airy storybook tones.',
       'This is opened by a happy smile, so every world must feel emotionally safe, hopeful, and delightful even when its palette is dark or strange. Weird and adult-curious is welcome; creepy is not. Never use horror, menace, gore, death, skulls, predatory creatures, haunted or blank stares, threatening figures, sinister dolls, porcelain dolls, pale ghostly children, distorted faces, weeping faces, evil eyes, or despair. Give every unusual image a warm, curious, or playful anchor.',
       `The required art direction for this door is: ${artDirection} The returned visualDirection MUST state and preserve this direction clearly; it controls every generated image in this world.`,
-      'The `surprise` is a hidden wonder: a single delightful visual event or object. Write it only in the `surprise` field. It must be completely absent from the visible scene. Never describe, name, depict, foreshadow, silhouette, or include it in the `scene.backdrop`, `scene.elements`, worldName, story, or quote. Do not place a second glowing doorway, secret arch, or lookalike stand-in for the hidden wonder in the visible scene; the traveler must not see it until a WOW face reveals it.',
+      'The `surprise` is a hidden wonder: a single delightful visual OBJECT or creature, described the same way a scene element would be (a vivid 8-20 word visual description of one thing). It is never a doorway, arch, gate, portal, or keyhole, and never a person, traveler, or human figure — those break the single-object rule and would visually clash with the rest of the cast. Write it only in the `surprise` field. It must be completely absent from the visible scene. Never describe, name, depict, foreshadow, silhouette, or include it in the `scene.backdrop`, `scene.elements`, worldName, story, or quote. Do not place a second glowing doorway, secret arch, or lookalike stand-in for the hidden wonder in the visible scene; the traveler must not see it until a WOW face reveals it.',
       'You also cast the visible scene. Every element gets a `description`: a vivid 8-20 word visual description of that exact thing as it appears in THIS story, weaving in the palette and art direction from visualDirection. The scene `backdrop` is one sentence of distant scenery with NO doorway, arch, gate, or portal. Pick each element\'s closest stand-in `sprite` from the kit: lantern-boat, crescent-moon, garden-door, cloud, wave, star. These are interaction stand-ins, not a requirement to include their literal subject. HARD RULE: at most ONE doorway/arch/portal in the entire world — use `garden-door` for it if needed, and never describe doors on any other sprite or in the backdrop. Sizes: tiny, small, grand, colossal. Motions: drift, bob, spin-slow, float, still. Positions are percentages (x 0-100 left-to-right, y 0-100 top-to-bottom).',
       'Compose for readability: floating subjects must have strong value and color contrast against the backdrop so they remain easy to see. Keep subjects out of the top title band (about y 0-22), the bottom control band (about y 72-100), the bottom-left smile meter, and the top-right sound controls. Subjects may overlap each other a little for depth, but must not cover the UI and must remain individually readable.',
       'Cast 3 to 6 elements and compose an original scene with impossible scale, depth, and a clear focal point. The story, descriptions, and scene must clearly belong to the same world.',

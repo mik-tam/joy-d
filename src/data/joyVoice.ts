@@ -1,13 +1,20 @@
-// Soft storyteller voice for JOY:D world readings. Uses the browser's built-in
-// Speech Synthesis API and prefers the most natural English voice available on
-// the device — never sends text to a remote TTS service.
+// Soft storyteller voice for JOY:D world readings. Primary path is a neural
+// text-to-speech reading fetched from the server (only the AI-generated
+// story text is sent — never camera frames or face data, same rule as image
+// generation). If that's unavailable, this falls back to the browser's
+// built-in Speech Synthesis API so a reading is always possible.
 
 type SpeakHandlers = {
   onDone?: () => void
   onError?: () => void
 }
 
+type NarrationCapsule = { worldName: string; story: string; quote: string }
+
 let voicesReady = false
+let currentAudio: HTMLAudioElement | null = null
+let currentToken = 0
+const audioCache = new Map<string, string>()
 
 function isAppleTouchDevice() {
   if (typeof navigator === 'undefined') return false
@@ -84,11 +91,19 @@ function pickSoftVoice(): SpeechSynthesisVoice | null {
   return [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] ?? null
 }
 
+function narrationScript(worldName: string, story: string, quote: string) {
+  const title = worldName.trim().replace(/[.!?]+$/, '')
+  const quoteText = quote.trim().replace(/^["“]|["”]$/g, '')
+  const storyText = story.trim()
+  const parts = [title ? `${title}.` : '', storyText, quoteText ? `“${quoteText}”` : ''].filter(Boolean)
+  return parts.join(' ')
+}
+
 function softScript(worldName: string, story: string, quote: string) {
-  // One sentence per utterance, on every device: a long single utterance
-  // reads flat and mechanical, but short breaths between sentences (with a
-  // pause between them, see speakNext) give the reading a storyteller's
-  // cadence instead of one unbroken machine dump.
+  // One sentence per utterance: a long single utterance reads flat and
+  // mechanical on the browser's own voices, but short breaths between
+  // sentences (with a pause between them, see speakNext) give the fallback
+  // reading a storyteller's cadence instead of one unbroken machine dump.
   const title = worldName.trim().replace(/[.!?]+$/, '')
   const quoteText = quote.trim().replace(/^["“]|["”]$/g, '')
   const storyText = story.trim()
@@ -105,14 +120,21 @@ function softScript(worldName: string, story: string, quote: string) {
 }
 
 export function stopJoyVoice() {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
-  window.speechSynthesis.cancel()
+  currentToken += 1
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio.src = ''
+    currentAudio = null
+  }
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
+  }
 }
 
-export function speakJoyWorld(
-  capsule: { worldName: string; story: string; quote: string },
-  { onDone, onError }: SpeakHandlers = {},
-) {
+// The browser's own Speech Synthesis API — used only when the neural
+// narration fetch below is unavailable (offline, no OpenAI key, request
+// failed). Lower quality, but keeps a reading possible either way.
+function speakWithBrowserVoice(capsule: NarrationCapsule, token: number, { onDone, onError }: SpeakHandlers) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     onError?.()
     return
@@ -130,17 +152,17 @@ export function speakJoyWorld(
   const hasQuote = Boolean(capsule.quote.trim().replace(/^["“]|["”]$/g, ''))
 
   let index = 0
-  let cancelled = false
   const mobile = isAppleTouchDevice() || isAndroidDevice()
 
+  const cancelled = () => token !== currentToken
+
   const finishError = () => {
-    if (cancelled) return
-    cancelled = true
+    if (cancelled()) return
     onError?.()
   }
 
   const speakNext = () => {
-    if (cancelled) return
+    if (cancelled()) return
     if (index >= chunks.length) {
       onDone?.()
       return
@@ -169,7 +191,7 @@ export function speakJoyWorld(
     utterance.pitch = (mobile ? 1.06 : 1.02) + jitter * 0.6
     utterance.volume = 1
     utterance.onend = () => {
-      if (cancelled) return
+      if (cancelled()) return
       const pause =
         index >= chunks.length
           ? 0
@@ -198,10 +220,69 @@ export function speakJoyWorld(
   if (!voicesReady && synth.getVoices().length === 0) {
     synth.addEventListener('voiceschanged', begin, { once: true })
     window.setTimeout(() => {
-      if (!cancelled && synth.getVoices().length > 0) begin()
+      if (!cancelled() && synth.getVoices().length > 0) begin()
     }, 220)
     return
   }
 
   begin()
+}
+
+async function fetchNarrationAudio(capsule: NarrationCapsule): Promise<string | null> {
+  const cached = audioCache.get(capsule.worldName)
+  if (cached) return cached
+
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 30_000)
+  try {
+    const response = await fetch('/api/joy-narration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: narrationScript(capsule.worldName, capsule.story, capsule.quote) }),
+      signal: controller.signal,
+    })
+    if (!response.ok) return null
+    const result: unknown = await response.json()
+    const audio = (result as { audio?: unknown })?.audio
+    if (typeof audio !== 'string' || !audio) return null
+    audioCache.set(capsule.worldName, audio)
+    return audio
+  } catch {
+    return null
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+export function speakJoyWorld(capsule: NarrationCapsule, handlers: SpeakHandlers = {}) {
+  stopJoyVoice()
+  const token = currentToken
+  const { onDone, onError } = handlers
+
+  void fetchNarrationAudio(capsule).then((audioUrl) => {
+    if (token !== currentToken) return
+    if (!audioUrl) {
+      speakWithBrowserVoice(capsule, token, handlers)
+      return
+    }
+    const audio = new Audio(audioUrl)
+    currentAudio = audio
+    audio.onended = () => {
+      if (token !== currentToken) return
+      currentAudio = null
+      onDone?.()
+    }
+    audio.onerror = () => {
+      if (token !== currentToken) return
+      currentAudio = null
+      // The fetch succeeded but playback itself failed — still fall back
+      // rather than leaving the traveler with a silently broken button.
+      speakWithBrowserVoice(capsule, token, { onDone, onError })
+    }
+    void audio.play().catch(() => {
+      if (token !== currentToken) return
+      currentAudio = null
+      speakWithBrowserVoice(capsule, token, { onDone, onError })
+    })
+  })
 }

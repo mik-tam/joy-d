@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handleJoyCapsuleRequest } from './lib/joyCapsules.mjs'
 import { handleJoySceneRequest } from './lib/joyScenes.mjs'
+import { handleJoyNarrationRequest } from './lib/joyNarration.mjs'
 import { handleSmileMatchRequest } from './lib/smileMatches.mjs'
 
 // This Express app is the local dev/preview server (proxied from Vite in
@@ -27,6 +28,11 @@ app.post('/api/joy-capsules', async (request, response) => {
 
 app.post('/api/joy-scenes', async (request, response) => {
   const { status, body } = await handleJoySceneRequest(request.body)
+  response.status(status).json(body)
+})
+
+app.post('/api/joy-narration', async (request, response) => {
+  const { status, body } = await handleJoyNarrationRequest(request.body)
   response.status(status).json(body)
 })
 
