@@ -58,11 +58,11 @@ export async function handleJoySceneRequest(requestBody) {
     return { status: 400, body: { code: 'INVALID_SCENE_REQUEST' } }
   }
   // JOYD_IMAGE_PROVIDER=openai|openrouter pins the image provider; by default
-  // OpenRouter wins when its key exists, matching the text provider.
-  const pinnedProvider = process.env.JOYD_IMAGE_PROVIDER
+  // OpenRouter wins when its key exists (credits for gpt-image-1-mini).
+  const pinnedProvider = process.env.JOYD_IMAGE_PROVIDER?.trim().toLowerCase()
   const useOpenRouterImages = pinnedProvider === 'openai'
     ? false
-    : pinnedProvider === 'openrouter' || Boolean(process.env.OPENROUTER_API_KEY)
+    : pinnedProvider === 'openrouter' || Boolean(process.env.OPENROUTER_API_KEY?.trim())
   const imageKeyAvailable = useOpenRouterImages
     ? Boolean(process.env.OPENROUTER_API_KEY)
     : Boolean(process.env.OPENAI_API_KEY)
@@ -86,7 +86,7 @@ export async function handleJoySceneRequest(requestBody) {
       headers: {
         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:5173',
+        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'https://joy-d-one.vercel.app',
         'X-OpenRouter-Title': 'JOY:D',
       },
       body: JSON.stringify({

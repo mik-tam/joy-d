@@ -904,7 +904,7 @@ function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: (
       isLocalHost ? (
         <>This model is not available right now. Check <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, restart, and try again.</>
       ) : (
-        <>This chat model is blocked or unavailable on the AI provider (OpenRouter may reject some OpenAI chat models with a Terms of Service error). Set <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> to <code className="rounded bg-white/10 px-1.5 py-0.5">google/gemini-2.5-flash</code>, save, and redeploy.</>
+        <>This chat model is blocked or unavailable on OpenRouter. In Vercel → Environment Variables, set <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL=google/gemini-2.5-flash</code> (not an <code className="rounded bg-white/10 px-1.5 py-0.5">openai/gpt-*</code> chat model), confirm <code className="rounded bg-white/10 px-1.5 py-0.5">JOYD_TEXT_PROVIDER=openrouter</code>, then redeploy.</>
       )
     ) : (
       <>A little stardust got tangled. Try gathering this world again.</>
