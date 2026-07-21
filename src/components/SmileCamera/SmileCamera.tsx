@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { useSmileDetection } from './useSmileDetection'
-import { createJoySignature, type JoySignature } from './createJoySignature'
+import { createJoySignature, bloomLabel, type JoySignature } from './createJoySignature'
 import { PortalReveal } from '../Portal/PortalReveal'
 import { playPortalChime, setJoySoundsEnabled } from '../../data/joySounds'
 
@@ -41,10 +41,26 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     // the traveler through the door.
     enterReleaseRef.current = true
   }, [])
+  const handleSmileMomentChange = useCallback((moment: Parameters<typeof createJoySignature>[0]) => {
+    setJoySignature((current) => {
+      if (!current) return createJoySignature(moment)
+      const next = createJoySignature(moment)
+      // Keep the print identity stable once unlocked; only refresh the live
+      // measurements drawn from this continuing smile.
+      return {
+        ...current,
+        heldForMs: next.heldForMs,
+        riseRate: next.riseRate,
+        shape: next.shape,
+        signalPercent: next.signalPercent,
+      }
+    })
+  }, [])
   const { error: smileError, smileScore, status: smileStatus, wowScore } = useSmileDetection({
     enabled: cameraState === 'preview',
     videoRef,
     onSmileDetected: handleSmileDetected,
+    onSmileMomentChange: handleSmileMomentChange,
   })
   const smileMeterPercent = Math.min(Math.round((smileScore / 0.45) * 100), 100)
 
@@ -210,7 +226,11 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
         }
         transition={entering ? { duration: reduceMotion ? 0.3 : 1.15, ease: [0.55, 0, 0.85, 0.35] } : { duration: 0 }}
         style={{ transformOrigin: '50% 46%' }}
-        className="absolute inset-0 flex flex-col items-center justify-center px-6"
+        className={`absolute inset-0 flex flex-col items-center px-5 sm:px-6 ${
+          smileUnlocked
+            ? 'justify-start overflow-y-auto overscroll-contain py-16 pb-8 sm:justify-center sm:py-10'
+            : 'justify-center overflow-hidden'
+        }`}
       >
       {/* The doorway from the landing page, drawn close: the glowing arch and
           its stairs sit at the very center of the screen. */}
@@ -243,7 +263,9 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
         initial={reduceMotion ? false : { opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="relative z-10 mb-6 flex items-center gap-2 text-[0.68rem] font-bold tracking-[0.28em] text-amber-100/85 sm:text-xs"
+        className={`relative z-10 flex items-center gap-2 text-[0.68rem] font-bold tracking-[0.28em] text-amber-100/85 sm:text-xs ${
+          smileUnlocked ? 'mb-3 sm:mb-6' : 'mb-6'
+        }`}
       >
         <Sparkles className="size-4" aria-hidden="true" />
         THE FIRST LITTLE DOOR
@@ -253,7 +275,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
         initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 14 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
-        className="relative z-10"
+        className={`relative z-10 flex w-full max-w-[22rem] flex-col items-center ${smileUnlocked ? 'origin-top scale-[0.78] sm:scale-95' : ''}`}
       >
         {/* The celebration bursts out from behind the doorway itself. */}
         {cameraState === 'preview' && smileUnlocked && !celebrationComplete && !reduceMotion && (
@@ -377,20 +399,20 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
             </div>
           )}
         </ArchWindow>
-        {/* The signature profile hangs beneath the doorway without moving it. */}
-        {cameraState === 'preview' && smileUnlocked && joySignature && (
+      </motion.div>
+
+      <div className="relative z-10 mt-3 flex w-full max-w-[22rem] flex-col items-center px-1 text-center sm:mt-6">
+        {cameraState === 'preview' && smileUnlocked && joySignature ? (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: reduceMotion ? 0 : 0.9, duration: 0.5, ease: 'easeOut' }}
-            className="absolute left-1/2 top-[calc(100%+0.9rem)] z-20 -translate-x-1/2"
+            transition={{ delay: reduceMotion ? 0 : 0.35, duration: 0.5, ease: 'easeOut' }}
+            className="w-full"
           >
             <JoySignatureCard signature={joySignature} />
           </motion.div>
-        )}
-      </motion.div>
+        ) : null}
 
-      <div className="relative z-10 mt-6 flex min-h-[5.5rem] flex-col items-center text-center">
         {cameraState === 'idle' && (
           <p className="max-w-sm text-xs leading-relaxed text-white/60">
             Your smile is the key. Camera and face signals stay in your browser; only a playful, non-scientific creative signature begins the story.
@@ -474,32 +496,32 @@ function SignatureStat({ label, value, percent }: { label: string; value: string
 // unique print, its ID, and the little measurements that composed it.
 function JoySignatureCard({ signature }: { signature: JoySignature }) {
   return (
-    <section className="w-[min(88vw,22rem)] rounded-2xl border border-white/15 bg-[#241040]/92 p-4 text-left shadow-2xl shadow-black/40 backdrop-blur-md">
-      <div className="flex items-center gap-3.5">
-        <JoyPrint signature={signature} className="size-16 shrink-0" />
+    <section className="w-full rounded-2xl border border-white/15 bg-[#241040]/92 p-3.5 text-left shadow-2xl shadow-black/40 backdrop-blur-md sm:p-4">
+      <div className="flex items-center gap-3 sm:gap-3.5">
+        <JoyPrint signature={signature} className="size-14 shrink-0 sm:size-16" />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
             <p className="text-[9px] font-bold tracking-[0.2em] text-amber-100/70">YOUR JOY SIGNATURE</p>
             <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
           </div>
-          <p className="mt-0.5 truncate font-serif text-lg font-black leading-tight text-white">{signature.wonderTitle}</p>
+          <p className="mt-0.5 truncate font-serif text-base font-black leading-tight text-white sm:text-lg">{signature.wonderTitle}</p>
           <p className="text-xs text-white/60">{signature.shape}</p>
         </div>
       </div>
-      <div className="mt-3 grid gap-1.5 border-t border-white/10 pt-3">
+      <div className="mt-2.5 grid gap-1.5 border-t border-white/10 pt-2.5 sm:mt-3 sm:pt-3">
         <SignatureStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
         <SignatureStat
           label="HOLD"
           value={`${(signature.heldForMs / 1000).toFixed(1)}s`}
-          percent={(signature.heldForMs / 2000) * 100}
+          percent={(signature.heldForMs / 4000) * 100}
         />
         <SignatureStat
           label="BLOOM"
-          value={signature.riseRate >= 0.35 ? 'quick' : 'gentle'}
-          percent={(signature.riseRate / 0.8) * 100}
+          value={bloomLabel(signature.riseRate)}
+          percent={(signature.riseRate / 1) * 100}
         />
       </div>
-      <p className="mt-2.5 text-[10px] leading-relaxed text-white/40">
+      <p className="mt-2 text-[10px] leading-relaxed text-white/40 sm:mt-2.5">
         A creative reading of this one smile — its print belongs to this moment alone. Never identity, never emotion analysis. Nothing leaves your browser.
       </p>
     </section>
