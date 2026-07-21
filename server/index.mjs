@@ -30,8 +30,8 @@ app.post('/api/joy-scenes', async (request, response) => {
   response.status(status).json(body)
 })
 
-app.post('/api/smile-matches', (request, response) => {
-  const { status, body } = handleSmileMatchRequest(request.body)
+app.post('/api/smile-matches', async (request, response) => {
+  const { status, body } = await handleSmileMatchRequest(request.body)
   response.status(status).json(body)
 })
 

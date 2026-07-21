@@ -21,7 +21,7 @@ A few decisions I made with Codex along the way:
 - Camera frames, face landmarks, raw smile data: all stay in the browser. Only a deliberately playful creative signature reaches the server.
 - The Smile Signature is a creative cue. Not emotion science. Not identity. Not biometric matching.
 - Free-model generation had to survive slow responses, duplicate dev requests, and Markdown-wrapped JSON. So it does.
-- The matching mechanism is genuinely local, with transparent seeded demo travelers. Not a claim to a social network that doesn't exist.
+- Matching is an explicit opt-in to a seven-day anonymous pool. It never uses identity or camera data, and never pretends a demo traveler is a real person.
 
 **Runtime note:** JOY:D runs on any OpenAI-compatible runtime. OpenAI config defaults to `gpt-5.6`; OpenRouter is an optional local demo fallback. The project itself was built with Codex using GPT-5.6.
 
@@ -41,7 +41,7 @@ A few decisions I made with Codex along the way:
 - MediaPipe Face Landmarker for browser-local smile signal detection
 - OpenAI-compatible API calls through OpenRouter or OpenAI for Joy Capsule generation
 - AI scene casting: the model writes a vivid visual description for every element of its own story (a miniature boat, travelers stepping off clouds) plus a backdrop line, with escalating whimsy briefs per depth and a deterministic fallback scene when a model cannot hold the schema
-- Live world painting: every world's visuals generate in real time, transparent watercolor sprites for each cast element plus a distant backdrop, style-locked to the capsule's LOOK direction. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or straight through OpenAI's `gpt-image-1` otherwise. `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit; the generated art blooms in as it arrives. Without image credit, the kit is still the complete experience
+- Live world painting: every world's visuals generate in real time, with image prompts following an explicit per-world art direction rather than a single default visual style. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or straight through OpenAI's `gpt-image-1` otherwise. `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit; the generated art blooms in as it arrives. Without image credit, the kit is still the complete experience
 - Express for local dev/preview and any persistent-Node host; the same three route handlers also run as Vercel serverless functions for a Vercel deployment (see Deploy below)
 - Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
 - A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
@@ -60,12 +60,12 @@ JOY:D is a creative experience. Not an emotion-analysis product. Not biometric i
 - The camera remains active inside the portal so the live smile can light each world and open doors. This is disclosed in the portal UI, processing stays entirely in the browser, and the camera stops when the portal closes.
 - World image generation sends only AI-generated story text (element descriptions, backdrop line, and the LOOK direction) to the image API. Never camera frames, face data, or anything typed by the user.
 - The AI generator receives a playful creative signature: a shape, a signal percentage, a three-color trail, and a whimsical title. On deeper discoveries, it also receives earlier world names solely to avoid repeating them.
-- Smile Matching receives only shape, signal percentage, color trail, and a temporary random session token that prevents matching a browser session with itself. It never uses a name, account, location, camera frame, or face data.
-- Local matching entries live only in server memory, are removed when the next match request finds them older than 30 minutes, and disappear when the local server restarts. The first matching result may use a clearly disclosed seeded demo traveler so the demo has a satisfying ending.
+- Smile Matching is an explicit opt-in. It receives only shape, signal percentage, color trail, a temporary random session token that prevents matching a browser session with itself, and the names and quotes of the three AI-generated worlds. It never uses a name, account, location, camera frame, or face data.
+- With Supabase configured, opted-in profiles are stored for up to seven days so a real anonymous traveler can discover them. Expired profiles are deleted on matching requests; no seeded demo travelers are used. Without Supabase, matching is unavailable rather than simulated.
 
 ## Run locally
 
-No separate sample-data download is required. The repository includes the browser model and clearly disclosed seeded demo travelers used to make the anonymous matching finale runnable from a first local session.
+No separate sample-data download is required. The repository includes the browser model. Configure Supabase if you want real anonymous matching in local development.
 
 ### Prerequisites
 
@@ -115,17 +115,18 @@ The three `/api` routes (`joy-capsules`, `joy-scenes`, `smile-matches`) are impl
 
 Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in your host's encrypted environment settings. Never expose either key in a Vite `VITE_*` variable. Deploy over HTTPS: browsers require a secure context for camera access outside `localhost`.
 
-The matching pool lives in process memory only: ephemeral, capped, and cleared on restart. No camera frames, face landmarks, or raw smile measurements are sent to the server in any deployment.
+For real anonymous matching, run `supabase/migrations/20260721_create_joyd_match_profiles.sql` in the Supabase SQL editor, then set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as server-only environment variables. Profiles contain only opted-in creative signature fields and three AI-generated world summaries, expire after seven days, and remain inaccessible from the browser through Row Level Security.
+
+No camera frames, face landmarks, or raw smile measurements are sent to the server in any deployment.
 
 ### Option A: Vercel
 
 1. Import the repo in Vercel. The **Vite** framework preset is fine. Vercel auto-detects the `api/` folder and turns it into serverless functions regardless of preset.
 2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `openrouter/free`), `OPENROUTER_IMAGE_MODEL` (default `openai/gpt-image-1-mini`), `OPENROUTER_SITE_URL` (your deployed URL, used as the OpenRouter referer header), `JOYD_WORLD_IMAGES=on`. Or use `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_IMAGE_MODEL` instead if you'd rather run on OpenAI directly (`JOYD_TEXT_PROVIDER` / `JOYD_IMAGE_PROVIDER` can pin one or the other independently).
-3. Deploy. No `vercel.json` is needed.
+3. For real anonymous matching, run the Supabase migration and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+4. Deploy. No `vercel.json` is needed.
 
 `api/joy-capsules.js` and `api/joy-scenes.js` set `maxDuration` (90s / 120s) to cover the slower story and image generation calls. Raise these in the function file if you change the provider timeouts in `server/lib/*.mjs`.
-
-**Known trade-off on Vercel:** the live matching pool (`server/lib/smileMatches.mjs`) is a plain in-memory array. On the Express host that's one persistent process, so it behaves exactly as documented. On Vercel, each function instance has its own memory and can be recycled between requests, so the pool is best-effort there. Some matches will resolve against another *live* traveler if you hit a warm instance, but most fall back to the seeded demo travelers. Same disclosed fallback UX either way. Nothing breaks. If you want guaranteed cross-instance live matching on Vercel, swap the storage in that one file for a shared store (Vercel KV / Upstash Redis); the three exported functions' signatures wouldn't need to change.
 
 ### Option B: a persistent Node host (Render / Railway / Fly.io / a VPS)
 
@@ -143,7 +144,7 @@ Hosts normally provide `PORT`; `npm start` binds to the host's network interface
 3. Open the portal. Hold a smile until the next door charges open (or tap **Go deeper**). Do it twice.
 4. Open **Create my Joy Story** with one long smile (or a tap), then select **Let my smile find another**.
 
-The matching finale is local and anonymous. Its first result may be a clearly disclosed seeded demo traveler; a later local session can match a short-lived anonymous live traveler.
+The matching finale is anonymous and opt-in. With Supabase configured, it can match a real traveler who has opted in during the previous seven days; otherwise it explains that no live traveler is waiting rather than using a demo profile.
 
 ## Codex feedback session ID
 
