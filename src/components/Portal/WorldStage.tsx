@@ -271,7 +271,7 @@ export function WorldSecret({
               : { opacity: 1, scale: [0.8, 1.16, 0.8], rotate: [0, 8, -5, 0] }
         }
         transition={hiddenRevealed || reduceMotion ? { duration: 0.45 } : { duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute z-20 grid size-16 place-items-center rounded-[42%] border-2 border-white/85 bg-white/15 text-3xl shadow-[0_0_0_6px_rgba(255,231,163,0.17),0_0_35px_12px_rgba(255,220,119,0.55)] backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-white/60"
+        className="absolute z-20 grid size-[4.5rem] place-items-center rounded-[42%] border-2 border-white/85 bg-white/15 text-3xl shadow-[0_0_0_6px_rgba(255,231,163,0.17),0_0_35px_12px_rgba(255,220,119,0.55)] backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-white/60"
         style={{
           color: style.glow,
           left: `${left}%`,
@@ -281,7 +281,21 @@ export function WorldSecret({
         aria-label={hiddenRevealed ? 'Hidden wonder discovered' : `Reveal the hidden wonder with a WOW face — or tap: ${hiddenLabel}`}
         disabled={hiddenRevealed}
       >
-        <Sparkles className="size-7" aria-hidden="true" />
+        <motion.span
+          animate={reduceMotion ? undefined : { rotate: [0, 12, -12, 0], scale: [1, 1.12, 1] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+          className="relative grid place-items-center"
+          aria-hidden="true"
+        >
+          <Sparkles className="size-8" />
+          <motion.span
+            animate={reduceMotion ? undefined : { opacity: [0.65, 1, 0.65], scale: [0.92, 1.08, 0.92] }}
+            transition={{ duration: 1.35, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -bottom-4 rounded-full bg-[#2a164e]/75 px-1.5 py-0.5 text-[10px] font-black tracking-[0.18em] text-amber-100 shadow-[0_0_12px_rgba(255,221,122,0.8)]"
+          >
+            WOW
+          </motion.span>
+        </motion.span>
       </motion.button>
       {transformed && revealedImage && (
         <motion.div
