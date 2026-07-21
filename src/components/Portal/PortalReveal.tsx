@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Camera, CameraOff, HeartHandshake, Loader2, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, CameraOff, ChevronDown, ChevronUp, HeartHandshake, Loader2, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { bloomLabel, type JoySignature } from '../SmileCamera/createJoySignature'
 import type { SmileDetectionStatus } from '../SmileCamera/useSmileDetection'
@@ -52,6 +52,9 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   const [chimesOn, setChimesOn] = useState(true)
   const [isReading, setIsReading] = useState(false)
   const [isLoadingVoice, setIsLoadingVoice] = useState(false)
+  // The world's story panel can be tucked away to reveal the painted scene
+  // (and its floating elements) behind it, then tapped open again.
+  const [storyCollapsed, setStoryCollapsed] = useState(false)
   const [revealedWorlds, setRevealedWorlds] = useState<Set<string>>(() => new Set())
   const [smileCharge, setSmileCharge] = useState(0)
   const [sceneImagesByWorld, setSceneImagesByWorld] = useState<Record<string, WorldSceneImages>>({})
@@ -164,6 +167,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   useEffect(() => {
     activeCapsuleRef.current = activeCapsule
   }, [activeCapsule])
+
+  // Each new world opens with its story shown.
+  useEffect(() => {
+    setStoryCollapsed(false)
+  }, [activeWorldName])
 
   // Paint the hidden wonder's form as soon as its world opens, so the WOW
   // reveal is instant.
@@ -544,9 +552,29 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             <p className="mt-1.5 text-sm italic text-amber-50/90 drop-shadow-[0_1px_8px_rgba(9,4,25,0.8)]">
               “{activeCapsule.quote}”
             </p>
-            <p className="mx-auto mt-3 max-w-lg rounded-2xl bg-[#10051f]/35 px-4 py-2.5 text-xs leading-relaxed text-white/85 backdrop-blur-[3px] drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)] sm:text-sm">
-              {activeCapsule.story}
-            </p>
+            <AnimatePresence initial={false}>
+              {!storyCollapsed && (
+                <motion.p
+                  key="world-story"
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.25, ease: 'easeOut' }}
+                  className="mx-auto mt-3 max-w-lg rounded-2xl bg-[#10051f]/35 px-4 py-2.5 text-xs leading-relaxed text-white/85 backdrop-blur-[3px] drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)] sm:text-sm"
+                >
+                  {activeCapsule.story}
+                </motion.p>
+              )}
+            </AnimatePresence>
+            <button
+              type="button"
+              onClick={() => setStoryCollapsed((value) => !value)}
+              aria-expanded={!storyCollapsed}
+              className="pointer-events-auto mx-auto mt-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-1 text-[10px] font-semibold text-white/70 backdrop-blur transition active:scale-90 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+            >
+              {storyCollapsed ? <ChevronDown className="size-3.5" aria-hidden="true" /> : <ChevronUp className="size-3.5" aria-hidden="true" />}
+              {storyCollapsed ? 'Show story' : 'Hide story'}
+            </button>
           </motion.div>
 
           <motion.div
