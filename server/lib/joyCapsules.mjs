@@ -60,16 +60,15 @@ function clampSceneElement(element) {
   // Subjects may still overlap each other slightly for depth.
   let minX = halfWidth + 1
   let maxX = 99 - halfWidth
-  // Mid-stage band sits below the story card and above the CTA row.
+  // Mid-stage band sits below the story card and above the CTA row. minY is
+  // always >= 48, comfortably below the title/story panel above it, so that
+  // alone keeps the panel clear — no need to also force x toward one of two
+  // narrow side pockets (the previous approach), which fought this same
+  // function's own pairwise spacing when called every iteration of the
+  // solver below and reclustered multiple elements onto the same pocket.
   let minY = Math.max(48, 10 + halfHeight)
   let maxY = Math.min(66 - halfHeight * 0.15, 72 - halfHeight)
-  // Soft side preference so the center story panel stays clear.
-  if (element.x > 28 && element.x < 72) {
-    if (element.x < 50) maxX = Math.min(maxX, 24)
-    else minX = Math.max(minX, 76)
-  }
   if (element.y > 58) minX = Math.max(minX, 32)
-  if (element.y < 30) maxX = Math.min(maxX, 76)
   element.x = Math.min(maxX, Math.max(minX, element.x))
   element.y = Math.min(maxY, Math.max(minY, element.y))
 }
@@ -87,7 +86,7 @@ function spreadSceneElements(elements) {
         // is what previously let colossal/grand pairs land almost on top of
         // each other — their true rendered half-widths summed to far more
         // than the old radius-based minimum ever enforced.
-        const minDistance = (spriteFootprint[placed[a].size] + spriteFootprint[placed[b].size]) * 0.72
+        const minDistance = (spriteFootprint[placed[a].size] + spriteFootprint[placed[b].size]) * 0.9
         let dx = placed[b].x - placed[a].x
         let dy = placed[b].y - placed[a].y
         let distance = Math.hypot(dx, dy)
@@ -350,7 +349,11 @@ export async function handleJoyCapsuleRequest(requestBody) {
   }
 
   const STANDARD_TIMEOUT_MS = 45_000
-  const FREE_TIER_TIMEOUT_MS = 20_000
+  // Free tier is consistently reachable but can take close to the old 20s
+  // budget to respond. Cutting this down means most slow requests hand off
+  // to paid OpenAI well before a traveler would call it "loading forever" —
+  // worth the occasional redundant OpenAI call now that billing is set up.
+  const FREE_TIER_TIMEOUT_MS = 10_000
 
   let activeOpenRouterModel = useOpenRouter ? resolveOpenRouterChatModels()[0] : undefined
   let servedByOpenAIFallback = false

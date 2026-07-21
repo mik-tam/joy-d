@@ -5,6 +5,11 @@
 // built-in Speech Synthesis API so a reading is always possible.
 
 type SpeakHandlers = {
+  // Fired the moment audio actually begins — the neural path fetches first
+  // (a few real seconds), so callers can show a "Loading…" state up to this
+  // point instead of a misleading "Stop reading" before there's anything to
+  // stop.
+  onStart?: () => void
   onDone?: () => void
   onError?: () => void
 }
@@ -134,7 +139,7 @@ export function stopJoyVoice() {
 // The browser's own Speech Synthesis API — used only when the neural
 // narration fetch below is unavailable (offline, no OpenAI key, request
 // failed). Lower quality, but keeps a reading possible either way.
-function speakWithBrowserVoice(capsule: NarrationCapsule, token: number, { onDone, onError }: SpeakHandlers) {
+function speakWithBrowserVoice(capsule: NarrationCapsule, token: number, { onStart, onDone, onError }: SpeakHandlers) {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     onError?.()
     return
@@ -143,6 +148,9 @@ function speakWithBrowserVoice(capsule: NarrationCapsule, token: number, { onDon
   const synth = window.speechSynthesis
   synth.cancel()
   warmJoyVoices()
+  // The browser voice has no real loading phase — it's "started" as soon as
+  // we commit to this path.
+  onStart?.()
 
   const chunks = softScript(capsule.worldName, capsule.story, capsule.quote)
   if (!chunks.length) {
@@ -257,7 +265,7 @@ async function fetchNarrationAudio(capsule: NarrationCapsule): Promise<string | 
 export function speakJoyWorld(capsule: NarrationCapsule, handlers: SpeakHandlers = {}) {
   stopJoyVoice()
   const token = currentToken
-  const { onDone, onError } = handlers
+  const { onStart, onDone, onError } = handlers
 
   void fetchNarrationAudio(capsule).then((audioUrl) => {
     if (token !== currentToken) return
@@ -279,7 +287,9 @@ export function speakJoyWorld(capsule: NarrationCapsule, handlers: SpeakHandlers
       // rather than leaving the traveler with a silently broken button.
       speakWithBrowserVoice(capsule, token, { onDone, onError })
     }
-    void audio.play().catch(() => {
+    void audio.play().then(() => {
+      if (token === currentToken) onStart?.()
+    }).catch(() => {
       if (token !== currentToken) return
       currentAudio = null
       speakWithBrowserVoice(capsule, token, { onDone, onError })

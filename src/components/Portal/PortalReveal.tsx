@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, HeartHandshake, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, HeartHandshake, Loader2, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { bloomLabel, type JoySignature } from '../SmileCamera/createJoySignature'
 import type { SmileDetectionStatus } from '../SmileCamera/useSmileDetection'
@@ -49,6 +49,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   const [storyOpen, setStoryOpen] = useState(false)
   const [chimesOn, setChimesOn] = useState(true)
   const [isReading, setIsReading] = useState(false)
+  const [isLoadingVoice, setIsLoadingVoice] = useState(false)
   const [revealedWorlds, setRevealedWorlds] = useState<Set<string>>(() => new Set())
   const [smileCharge, setSmileCharge] = useState(0)
   const [sceneImagesByWorld, setSceneImagesByWorld] = useState<Record<string, WorldSceneImages>>({})
@@ -291,14 +292,23 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   const stopReading = () => {
     stopJoyVoice()
     setIsReading(false)
+    setIsLoadingVoice(false)
   }
 
   const readCapsuleAloud = (capsule: JoyCapsule) => {
     stopReading()
     setIsReading(true)
+    setIsLoadingVoice(true)
     speakJoyWorld(capsule, {
-      onDone: () => setIsReading(false),
-      onError: () => setIsReading(false),
+      onStart: () => setIsLoadingVoice(false),
+      onDone: () => {
+        setIsReading(false)
+        setIsLoadingVoice(false)
+      },
+      onError: () => {
+        setIsReading(false)
+        setIsLoadingVoice(false)
+      },
     })
   }
 
@@ -323,11 +333,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
       aria-modal="true"
       aria-labelledby="portal-title"
     >
-      <div
-        className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_21%_28%,rgba(255,255,255,0.5)_0_1px,transparent_1.6px),radial-gradient(circle_at_67%_57%,rgba(255,255,255,0.3)_0_1px,transparent_1.6px),radial-gradient(circle_at_44%_82%,rgba(255,255,255,0.38)_0_1px,transparent_1.6px),radial-gradient(circle_at_86%_16%,rgba(255,255,255,0.32)_0_1px,transparent_1.6px)]
-          [background-size:140px_150px,110px_120px,160px_140px,120px_170px]"
-        aria-hidden="true"
-      />
+      <Starfield stars={ringGateStars} reduceMotion={Boolean(reduceMotion)} />
       <div className="joy-paper-grain absolute inset-0" aria-hidden="true" />
 
       <AnimatePresence mode="wait">
@@ -587,12 +593,16 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
           <button
             type="button"
             onClick={() => (isReading ? stopReading() : readCapsuleAloud(activeCapsule))}
-            aria-label={isReading ? 'Stop the reading' : 'Hear this world'}
+            aria-label={isLoadingVoice ? 'Loading the reading' : isReading ? 'Stop the reading' : 'Hear this world'}
             aria-pressed={isReading}
             className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
           >
-            <Speech className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{isReading ? 'Stop reading' : 'Hear this world'}</span>
+            {isLoadingVoice ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Speech className="size-4" aria-hidden="true" />
+            )}
+            <span className="hidden sm:inline">{isLoadingVoice ? 'Loading…' : isReading ? 'Stop reading' : 'Hear this world'}</span>
           </button>
         )}
       </div>
@@ -949,42 +959,81 @@ const worldFallbackGradients = [
   'from-[#7a2f56] via-[#c65b62] to-[#f5a24f]',
 ]
 
-const cosmicStars = Array.from({ length: 96 }, (_, index) => {
-  const sample = (multiplier: number, offset: number) => ((index * multiplier + offset) % 997) / 997
-  return {
-    left: `${(sample(173, 59) * 98 + 1).toFixed(2)}%`,
-    top: `${(sample(419, 137) * 96 + 2).toFixed(2)}%`,
-    size: 1 + sample(277, 211) * 2.7,
-    opacity: 0.22 + sample(331, 307) * 0.7,
-    delay: sample(487, 89) * -6,
-    duration: 2.8 + sample(613, 401) * 4.8,
-    color: ['#ffffff', '#fff0bc', '#dfe5ff', '#efccff'][index % 4],
+// A seeded PRNG (mulberry32) rather than a hand-rolled index*multiplier%N
+// scheme: the latter correlates position with size/opacity/color whenever
+// they're all derived from the same small index, which reads as a faint
+// grid or diagonal streaks instead of an organically scattered sky.
+function mulberry32(seed: number) {
+  let state = seed
+  return () => {
+    state |= 0
+    state = (state + 0x6d2b79f5) | 0
+    let t = Math.imul(state ^ (state >>> 15), 1 | state)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
-})
+}
+
+type StarSpec = {
+  left: string
+  top: string
+  size: number
+  opacity: number
+  delay: number
+  duration: number
+  color: string
+}
+
+function makeStarfield(seed: number, count: number, colors: string[]): StarSpec[] {
+  const random = mulberry32(seed)
+  return Array.from({ length: count }, () => ({
+    left: `${(random() * 98 + 1).toFixed(2)}%`,
+    top: `${(random() * 96 + 2).toFixed(2)}%`,
+    size: 1 + random() * 2.7,
+    opacity: 0.22 + random() * 0.7,
+    delay: -random() * 6,
+    duration: 2.8 + random() * 4.8,
+    color: colors[Math.floor(random() * colors.length)],
+  }))
+}
+
+// A CSS tiled background-image (fixed background-size + repeat) always
+// reads as an obvious grid at this scale, no matter the tile's own dot
+// arrangement — individually placed, individually twinkling stars are what
+// actually look like a night sky, so every dark starfield in the portal
+// (ring gates, and the Joy Story finale below) uses this same renderer.
+function Starfield({ stars, reduceMotion }: { stars: StarSpec[]; reduceMotion: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {stars.map((star, index) => (
+        <motion.span
+          key={index}
+          animate={reduceMotion ? undefined : { opacity: [star.opacity * 0.35, star.opacity, star.opacity * 0.45], scale: [0.75, 1.25, 0.85] }}
+          transition={{ duration: star.duration, repeat: Infinity, repeatType: 'mirror', delay: star.delay, ease: 'easeInOut' }}
+          className="absolute rounded-full"
+          style={{
+            left: star.left,
+            top: star.top,
+            width: star.size,
+            height: star.size,
+            opacity: star.opacity,
+            backgroundColor: star.color,
+            boxShadow: star.size > 2.5 ? `0 0 ${star.size * 3}px ${star.color}88` : undefined,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+const ringGateStars = makeStarfield(17, 160, ['#ffffff', '#f3e6ff', '#dfe9ff', '#ffe9c2'])
+const cosmicStars = makeStarfield(42, 130, ['#ffffff', '#fff0bc', '#dfe5ff', '#efccff'])
 
 function CosmicBackdrop({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,#22143f_0%,#130b28_55%,#080414_100%)]" />
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        {cosmicStars.map((star, index) => (
-          <motion.span
-            key={index}
-            animate={reduceMotion ? undefined : { opacity: [star.opacity * 0.35, star.opacity, star.opacity * 0.45], scale: [0.75, 1.25, 0.85] }}
-            transition={{ duration: star.duration, repeat: Infinity, repeatType: 'mirror', delay: star.delay, ease: 'easeInOut' }}
-            className="absolute rounded-full"
-            style={{
-              left: star.left,
-              top: star.top,
-              width: star.size,
-              height: star.size,
-              opacity: star.opacity,
-              backgroundColor: star.color,
-              boxShadow: star.size > 2.5 ? `0 0 ${star.size * 3}px ${star.color}88` : undefined,
-            }}
-          />
-        ))}
-      </div>
+      <Starfield stars={cosmicStars} reduceMotion={reduceMotion} />
       {!reduceMotion && (
         <motion.div
           animate={{ opacity: [0.25, 0.5, 0.25] }}
@@ -1158,10 +1207,13 @@ function TravelerFlipCard({
             {worlds.slice(0, 3).map((world, index) => {
               const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
               const mark = spriteMarks[world.sprite ?? ''] ?? '✦'
-              // A JS-truncated quote (rather than CSS line-clamp) guarantees a
-              // fixed, predictable height inside this 3D-transformed flip
-              // card regardless of how the browser handles line-clamp there.
-              const quoteText = world.quote.length > 66 ? `${world.quote.slice(0, 63).trimEnd()}…` : world.quote
+              // A JS-truncated quote sized for ~2 wrapped lines at this
+              // column width (rather than CSS line-clamp, which the flip
+              // card's 3D transform may not reliably constrain) plus a fixed
+              // max-height as a hard backstop — this shows far more of the
+              // quote than a single-line truncate while still guaranteeing a
+              // predictable height and no scrollbar.
+              const quoteText = world.quote.length > 82 ? `${world.quote.slice(0, 79).trimEnd()}…` : world.quote
               return (
                 <li key={`${world.worldName}-${index}`} className="flex items-center gap-2">
                   <div className="relative size-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -1175,7 +1227,7 @@ function TravelerFlipCard({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-serif text-[11px] font-black leading-tight text-white">{world.worldName}</p>
-                    <p className="mt-0.5 truncate text-[9px] leading-snug text-white/45">“{quoteText}”</p>
+                    <p className="mt-0.5 max-h-[2.6em] overflow-hidden text-[9px] leading-snug text-white/45">“{quoteText}”</p>
                   </div>
                 </li>
               )

@@ -74,34 +74,18 @@ const spriteHalf: Record<WorldSceneElement['size'], number> = {
   colossal: 26,
 }
 
-// Keep floating subjects out of portal chrome: story panel (center-top),
-// bottom controls, smile meter, and corner buttons.
+// The server already places every element with knowledge of ALL of its
+// siblings (spreadSceneElements + clampSceneElement in joyCapsules.mjs), so
+// it's the source of truth for both non-overlap and staying clear of the
+// portal's UI chrome. This only guards the actual viewport edges. An earlier
+// version of this function re-clamped each element in isolation, collapsing
+// several unrelated elements into the same one or two safe pockets whenever
+// their y landed in a certain band — undoing the server's spacing entirely
+// and causing severe overlap.
 function placeAwayFromUi(x: number, y: number, size: WorldSceneElement['size'] = 'small') {
   const half = spriteHalf[size]
-  const floorY = size === 'colossal' || size === 'grand' ? 56 : 48
-  let nextX = Math.min(96 - half, Math.max(half + 2, x))
-  let nextY = Math.min(68 - half * 0.2, Math.max(22, y))
-
-  // Story panel sits in the upper center — clear that whole band.
-  if (nextY < floorY) {
-    nextY = floorY
-    if (nextX > 24 && nextX < 76) {
-      nextX = nextX < 50 ? Math.min(nextX, 18) : Math.max(nextX, 82)
-    }
-  }
-  // Bottom CTA band.
-  if (nextY > 70) nextY = 62
-  // Smile meter pocket (bottom-left).
-  if (nextX < 28 && nextY > 58) {
-    nextX = Math.max(nextX, 34)
-    nextY = Math.min(nextY, 56)
-  }
-  // Sound controls (top-right).
-  if (nextX > 78 && nextY < 30) {
-    nextX = 72
-    nextY = Math.max(nextY, floorY)
-  }
-
+  const nextX = Math.min(100 - half, Math.max(half, x))
+  const nextY = Math.min(100 - half * 0.2, Math.max(half * 0.2, y))
   return { x: nextX, y: nextY }
 }
 
