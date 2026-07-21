@@ -1,8 +1,8 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Camera, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowLeft, Camera, RefreshCw, Sparkles } from 'lucide-react'
+import { JoyPrint } from '../JoyPrint'
 import {
   type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
   useRef,
@@ -28,12 +28,20 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
   const [joySignature, setJoySignature] = useState<JoySignature | null>(null)
   const [portalOpen, setPortalOpen] = useState(false)
   const [celebrationComplete, setCelebrationComplete] = useState(false)
+  const [entering, setEntering] = useState(false)
+  const smileScoreRef = useRef(0)
+  const enterHoldRef = useRef<number | null>(null)
+  const enterReleaseRef = useRef(false)
+  const reduceMotion = useReducedMotion()
   const handleSmileDetected = useCallback((moment: Parameters<typeof createJoySignature>[0]) => {
     setJoySignature(createJoySignature(moment))
     setCelebrationComplete(false)
     setSmileUnlocked(true)
+    // The unlocking smile must be released before a fresh smile can carry
+    // the traveler through the door.
+    enterReleaseRef.current = true
   }, [])
-  const { error: smileError, smileScore, status: smileStatus } = useSmileDetection({
+  const { error: smileError, smileScore, status: smileStatus, wowScore } = useSmileDetection({
     enabled: cameraState === 'preview',
     videoRef,
     onSmileDetected: handleSmileDetected,
@@ -57,8 +65,14 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     setPortalOpen(true)
   }
 
+  const beginEntering = useCallback(() => {
+    if (entering || !smileUnlocked || !joySignature) return
+    setEntering(true)
+  }, [entering, joySignature, smileUnlocked])
+
   const returnToSmile = () => {
     setPortalOpen(false)
+    setEntering(false)
     stopCamera()
     setSmileUnlocked(false)
     setJoySignature(null)
@@ -131,65 +145,288 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     void videoRef.current.play().catch(() => undefined)
   }, [cameraState])
 
+  useEffect(() => {
+    if (!smileUnlocked) return
+    if (reduceMotion) {
+      setCelebrationComplete(true)
+      return
+    }
+    const timer = setTimeout(() => setCelebrationComplete(true), 2800)
+    return () => clearTimeout(timer)
+  }, [reduceMotion, smileUnlocked])
+
+  useEffect(() => {
+    smileScoreRef.current = smileScore
+  }, [smileScore])
+
+  // Once unlocked, a fresh held smile carries the traveler through the door.
+  useEffect(() => {
+    if (cameraState !== 'preview' || !smileUnlocked || portalOpen || entering) return
+    const tick = setInterval(() => {
+      const score = smileScoreRef.current
+      if (score < 0.36) enterReleaseRef.current = false
+      if (enterReleaseRef.current) return
+      if (score >= 0.45) {
+        enterHoldRef.current ??= performance.now()
+        if (performance.now() - enterHoldRef.current >= 700) {
+          enterHoldRef.current = null
+          beginEntering()
+        }
+      } else {
+        enterHoldRef.current = null
+      }
+    }, 120)
+    return () => clearInterval(tick)
+  }, [beginEntering, cameraState, entering, portalOpen, smileUnlocked])
+
+  // The sparkle burst plays, the doorway swallows the screen, then the
+  // portal void takes over.
+  useEffect(() => {
+    if (!entering) return
+    const timer = setTimeout(() => openPortal(), reduceMotion ? 250 : 950)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entering, reduceMotion])
+
+  const statusCaption = {
+    idle: 'Waking the smile signal…',
+    loading: 'Learning the shape of a smile…',
+    ready: 'A gentle smile opens the door',
+    'no-face': 'Step into the little window',
+    smiling: 'Keep smiling — it’s opening',
+    unavailable: 'The smile signal needs a moment',
+  }[smileStatus]
+
   return (
-    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#1b1033] px-6 py-12">
-      <div className="absolute inset-0 -z-30 bg-[url('/art/lantern-sea-hero.png')] bg-cover bg-[72%_center] opacity-45" />
-      <div className="absolute inset-0 -z-20 bg-[linear-gradient(145deg,rgba(29,15,57,0.93),rgba(54,29,86,0.8),rgba(20,55,80,0.86))]" />
-      <div className="joy-paper-grain absolute inset-0 -z-10" aria-hidden="true" />
+    <main className="relative isolate h-svh overflow-hidden bg-[#1c1136]">
       <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 60, repeat: Infinity, ease: 'linear' }}
-        className="absolute -right-24 -top-20 -z-10 size-96 rounded-full border border-white/15"
-      />
-
-      <section className="w-full max-w-xl">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-white/75 transition hover:text-white focus:outline-none focus:ring-4 focus:ring-white/20"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to the doorway
-        </button>
-
+        animate={
+          entering
+            ? reduceMotion
+              ? { opacity: 0 }
+              : { scale: 6, opacity: 0 }
+            : { scale: 1, opacity: 1 }
+        }
+        transition={entering ? { duration: reduceMotion ? 0.3 : 1.15, ease: [0.55, 0, 0.85, 0.35] } : { duration: 0 }}
+        style={{ transformOrigin: '50% 46%' }}
+        className="absolute inset-0 flex flex-col items-center justify-center px-6"
+      >
+      {/* The doorway from the landing page, drawn close: the glowing arch and
+          its stairs sit at the very center of the screen. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_110%,#5c3a5e_0%,#31204f_45%,#17102f_100%)]" />
+        <img
+          src="/art/portal-garden.png"
+          alt=""
+          className="absolute left-1/2 top-1/2 w-[max(175vw,175vh)] max-w-none -translate-x-[66.6%] -translate-y-[49%] opacity-40"
+        />
+        <div className="absolute inset-0 bg-[#160a31]/45" />
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: 'easeOut' }}
-          className="joy-paper-card rounded-[2.5rem] border border-[#ffe7a3]/30 bg-[#241442]/70 p-7 text-center shadow-2xl shadow-purple-950/45 backdrop-blur-xl sm:p-10"
-        >
-          <p className="flex items-center justify-center gap-2 text-xs font-semibold tracking-[0.28em] text-amber-100/80">
-            <Sparkles className="size-4" aria-hidden="true" />
-            THE FIRST LITTLE DOOR
-          </p>
+          animate={reduceMotion ? undefined : { opacity: [0.55, 0.8, 0.55] }}
+          transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute left-1/2 top-1/2 size-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,219,146,0.34)_0%,rgba(255,190,130,0.14)_45%,transparent_68%)] blur-xl"
+        />
+        <div className="joy-paper-grain absolute inset-0" />
+      </div>
 
-          <AnimatePresence mode="wait">
-            {cameraState === 'idle' && <IdleState onRequest={requestCamera} />}
-            {cameraState === 'requesting' && <RequestingState />}
-            {cameraState === 'preview' && (
-              <PreviewState
-                videoRef={videoRef}
-                smileError={smileError}
-                smileScore={smileScore}
-                smileStatus={smileStatus}
-                smileUnlocked={smileUnlocked}
-                joySignature={joySignature}
-                onOpenPortal={openPortal}
-                celebrationComplete={celebrationComplete}
-                onCelebrationComplete={() => setCelebrationComplete(true)}
+      <button
+        type="button"
+        onClick={handleBack}
+        className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        Back to the doorway
+      </button>
+
+      <motion.p
+        initial={reduceMotion ? false : { opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 mb-6 flex items-center gap-2 text-[0.68rem] font-bold tracking-[0.28em] text-amber-100/85 sm:text-xs"
+      >
+        <Sparkles className="size-4" aria-hidden="true" />
+        THE FIRST LITTLE DOOR
+      </motion.p>
+
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.94, y: 14 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: 'easeOut' }}
+        className="relative z-10"
+      >
+        {/* The celebration bursts out from behind the doorway itself. */}
+        {cameraState === 'preview' && smileUnlocked && !celebrationComplete && !reduceMotion && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-0" aria-hidden="true">
+            <UnlockBubbles />
+          </div>
+        )}
+        <ArchWindow glowing={smileUnlocked}>
+          {cameraState === 'idle' && (
+            <button
+              type="button"
+              onClick={() => void requestCamera()}
+              aria-label="Open my portal"
+              className="group absolute inset-0 focus:outline-none"
+            >
+              <div
+                className="absolute inset-0 opacity-95 transition group-hover:opacity-100"
+                style={{
+                  backgroundImage: 'url(/art/portal-garden.png)',
+                  backgroundSize: '880% auto',
+                  backgroundPosition: '69% 51%',
+                }}
               />
-            )}
-            {cameraState === 'denied' && <DeniedState onRetry={requestCamera} />}
-            {cameraState === 'unsupported' && <UnsupportedState />}
-          </AnimatePresence>
-        </motion.div>
-      </section>
+              <div className="absolute inset-0 bg-gradient-to-t from-[#2b1a4a]/45 via-transparent to-[#2b1a4a]/20 transition group-hover:from-[#2b1a4a]/25" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 transition group-hover:scale-105">
+                <div className="flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-400 text-purple-950 shadow-lg shadow-rose-950/30">
+                  <Camera className="size-6" aria-hidden="true" />
+                </div>
+                <span className="font-serif text-xl font-black leading-tight text-[#6b3a10] drop-shadow-[0_1px_0_rgba(255,247,214,0.85)]">
+                  Open my portal
+                </span>
+              </div>
+            </button>
+          )}
+
+          {cameraState === 'requesting' && (
+            <div className="absolute inset-0 grid place-items-center bg-[#241442]/70">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
+                className="size-16 rounded-full border-2 border-amber-100/25 border-t-amber-100"
+              />
+            </div>
+          )}
+
+          {cameraState === 'preview' && (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full -scale-x-100 object-cover"
+                aria-label="Live camera preview"
+              />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26%] bg-gradient-to-t from-[#160a31]/85 via-[#160a31]/35 to-transparent" />
+              {/* The smile meter lives on the window itself: bright light
+                  rises from the doorstep as the smile grows. */}
+              {!smileUnlocked && smileStatus !== 'unavailable' && (
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 transition-[height] duration-200"
+                  style={{ height: `${Math.min(Math.round((smileScore / 0.45) * 100), 100)}%` }}
+                >
+                  <div className="absolute inset-x-4 top-0 h-1 rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 shadow-[0_0_16px_4px_rgba(253,186,150,0.7)]" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-amber-200/80 via-rose-300/55 to-fuchsia-300/30" />
+                </div>
+              )}
+              {smileUnlocked && (
+                <div
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-amber-200/80 via-rose-300/45 to-fuchsia-300/30 transition-opacity duration-300"
+                  style={{ opacity: 0.3 + Math.min(smileScore, 1) * 0.65 }}
+                />
+              )}
+              <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-purple-950/60 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur">
+                <span className="size-1.5 rounded-full bg-rose-300 shadow-[0_0_10px_2px_rgba(253,164,175,0.6)]" />
+                LIVE
+              </div>
+              {smileUnlocked ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 px-4 text-center">
+                  <p className="text-sm font-black tracking-wide text-white drop-shadow-[0_1px_8px_rgba(20,8,42,1)]">
+                    The first door is unlocked!
+                  </p>
+                  <p className="mt-0.5 text-[10px] font-semibold text-amber-100/90 drop-shadow-[0_1px_6px_rgba(20,8,42,1)]">
+                    step through with a smile
+                  </p>
+                </div>
+              ) : (
+                <p className="pointer-events-none absolute inset-x-0 bottom-3.5 z-10 px-4 text-center text-xs font-bold tracking-wide text-white drop-shadow-[0_1px_8px_rgba(20,8,42,1)]">
+                  {statusCaption}
+                </p>
+              )}
+              {smileUnlocked && (
+                <button
+                  type="button"
+                  onClick={beginEntering}
+                  aria-label="Enter your first JOY:D world"
+                  className="absolute inset-0 z-20 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-100/70"
+                />
+              )}
+            </>
+          )}
+
+          {cameraState === 'denied' && (
+            <div className="absolute inset-0 grid place-items-center bg-[#241442]/80 p-6 text-center">
+              <div>
+                <span className="text-5xl">☁️</span>
+                <p className="mt-3 text-sm leading-relaxed text-white/75">The window stayed closed. JOY:D needs camera permission to begin.</p>
+              </div>
+            </div>
+          )}
+
+          {cameraState === 'unsupported' && (
+            <div className="absolute inset-0 grid place-items-center bg-[#241442]/80 p-6 text-center">
+              <div>
+                <span className="text-5xl">🔮</span>
+                <p className="mt-3 text-sm leading-relaxed text-white/75">This doorway needs a camera-enabled browser. Deployed portals also need HTTPS.</p>
+              </div>
+            </div>
+          )}
+        </ArchWindow>
+        {/* The signature profile hangs beneath the doorway without moving it. */}
+        {cameraState === 'preview' && smileUnlocked && joySignature && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: reduceMotion ? 0 : 0.9, duration: 0.5, ease: 'easeOut' }}
+            className="absolute left-1/2 top-[calc(100%+0.9rem)] z-20 -translate-x-1/2"
+          >
+            <JoySignatureCard signature={joySignature} />
+          </motion.div>
+        )}
+      </motion.div>
+
+      <div className="relative z-10 mt-6 flex min-h-[5.5rem] flex-col items-center text-center">
+        {cameraState === 'idle' && (
+          <p className="max-w-sm text-xs leading-relaxed text-white/60">
+            Your smile is the key. Camera and face signals stay in your browser; only a playful, non-scientific creative signature begins the story.
+          </p>
+        )}
+
+        {cameraState === 'requesting' && (
+          <p className="max-w-sm text-sm leading-relaxed text-white/70">
+            Your browser may ask for permission — it’s the key to this first door.
+          </p>
+        )}
+
+        {cameraState === 'preview' && !smileUnlocked && smileError && (
+          <p className="max-w-sm text-xs leading-relaxed text-rose-100/70">
+            Refresh and try again if the signal does not begin.
+          </p>
+        )}
+
+        {cameraState === 'denied' && (
+          <button
+            type="button"
+            onClick={() => void requestCamera()}
+            className="inline-flex items-center gap-2.5 rounded-full border border-white/40 bg-[#ffe8a8] px-6 py-3 font-bold text-purple-950 shadow-[0_8px_0_#b56a7a,0_14px_26px_rgba(20,8,42,0.38)] transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
+          >
+            <RefreshCw className="size-5" aria-hidden="true" />
+            Try camera again
+          </button>
+        )}
+      </div>
+      </motion.div>
+
+      {entering && !reduceMotion && <EnterSparkles />}
+
       <AnimatePresence>
         {portalOpen && joySignature && (
           <PortalReveal
             signature={joySignature}
             smileScore={smileScore}
             smileStatus={smileStatus}
+            wowScore={wowScore}
             onClose={returnToSmile}
           />
         )}
@@ -198,263 +435,106 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
   )
 }
 
-function CameraFrame({ children }: { children: ReactNode }) {
+// The camera window is itself a little arched doorway, cut from the same
+// silhouette as the landing page's portal-garden door.
+function ArchWindow({ children, glowing }: { children: ReactNode; glowing: boolean }) {
   return (
-    <div className="relative mx-auto mt-7 aspect-square w-full max-w-[21rem] overflow-hidden rounded-t-[9rem] rounded-b-[2rem] border border-[#ffe7a3]/35 bg-purple-950/45 shadow-[inset_0_0_0_5px_rgba(255,255,255,0.04),0_15px_35px_rgba(17,7,39,0.35)]">
-      <div className="absolute inset-3 rounded-t-[8rem] rounded-b-[1.55rem] border border-amber-100/35" />
-      <div className="pointer-events-none absolute -right-5 -top-6 text-4xl text-amber-100/70" aria-hidden="true">✦</div>
+    <div
+      className={`relative w-[min(72vw,17.5rem)] overflow-hidden rounded-t-[999px] rounded-b-[1.4rem] border-2 transition-all duration-700 aspect-[10/13] ${
+        glowing
+          ? 'border-amber-100/85 shadow-[0_0_60px_14px_rgba(255,219,146,0.4),0_18px_40px_rgba(17,7,39,0.45)]'
+          : 'border-[#ffe7a3]/45 shadow-[0_0_35px_6px_rgba(255,219,146,0.16),0_18px_40px_rgba(17,7,39,0.45)]'
+      }`}
+    >
       {children}
     </div>
   )
 }
 
-function IdleState({ onRequest }: { onRequest: () => void }) {
+function SignatureStat({ label, value, percent }: { label: string; value: string; percent: number }) {
   return (
-    <motion.div
-      key="idle"
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      className="mt-7"
-    >
-      <CameraFrame>
-        <div className="flex h-full flex-col items-center justify-center p-8">
-          <div className="flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 via-rose-300 to-fuchsia-400 text-purple-950 shadow-lg shadow-rose-950/25">
-            <Camera className="size-9" aria-hidden="true" />
-          </div>
-          <span className="mt-5 text-sm font-semibold text-white/75">A tiny window is waiting</span>
-        </div>
-      </CameraFrame>
-      <h1 className="mt-8 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-        Let’s say hello.
-      </h1>
-      <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
-        Open your camera when you’re ready. JOY:D only looks while this little window is open.
-      </p>
-      <button
-        type="button"
-        onClick={onRequest}
-        className="mt-8 inline-flex items-center gap-3 rounded-full bg-amber-100 px-6 py-3.5 font-bold text-purple-950 shadow-lg shadow-amber-950/20 transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
-      >
-        <Camera className="size-5" aria-hidden="true" />
-        Open my portal
-      </button>
-    </motion.div>
-  )
-}
-
-function RequestingState() {
-  return (
-    <motion.div
-      key="requesting"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="mt-7"
-    >
-      <CameraFrame>
-        <div className="flex h-full items-center justify-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
-            className="size-24 rounded-full border-2 border-amber-100/20 border-t-amber-100"
-          />
-        </div>
-      </CameraFrame>
-      <h1 className="mt-8 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-        Opening your little window…
-      </h1>
-      <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
-        Your browser may ask for permission. It’s the key to this first door.
-      </p>
-    </motion.div>
-  )
-}
-
-function PreviewState({
-  videoRef,
-  smileError,
-  smileScore,
-  smileStatus,
-  smileUnlocked,
-  joySignature,
-  onOpenPortal,
-  celebrationComplete,
-  onCelebrationComplete,
-}: {
-  videoRef: RefObject<HTMLVideoElement | null>
-  smileError: string | null
-  smileScore: number
-  smileStatus: 'idle' | 'loading' | 'ready' | 'no-face' | 'smiling' | 'unavailable'
-  smileUnlocked: boolean
-  joySignature: JoySignature | null
-  onOpenPortal: () => void
-  celebrationComplete: boolean
-  onCelebrationComplete: () => void
-}) {
-  const reduceMotion = useReducedMotion()
-  const statusCopy = {
-    idle: 'Waking the smile signal…',
-    loading: 'Learning the shape of a smile…',
-    ready: 'A gentle smile will open the first door.',
-    'no-face': 'Step into the little window.',
-    smiling: 'We see a little spark… keep smiling!',
-    unavailable: 'The smile signal needs another moment.',
-  }[smileStatus]
-
-  return (
-    <motion.div
-      key="preview"
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      className="mt-7"
-    >
-      <CameraFrame>
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          playsInline
-          className="h-full w-full scale-x-[-1] object-cover"
-          aria-label="Live camera preview"
+    <div className="flex items-center gap-2.5">
+      <span className="w-[4.4rem] shrink-0 text-[10px] font-bold tracking-[0.14em] text-amber-100/70">{label}</span>
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
+          style={{ width: `${Math.min(Math.max(percent, 4), 100)}%` }}
         />
-        <div className="absolute left-6 top-6 flex items-center gap-2 rounded-full bg-purple-950/60 px-3 py-1.5 text-xs font-bold text-white backdrop-blur">
-          <span className="size-2 rounded-full bg-rose-300 shadow-[0_0_12px_3px_rgba(253,164,175,0.6)]" />
-          LIVE
-        </div>
-      </CameraFrame>
-      <h1 className="mt-8 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-        {smileUnlocked ? 'A door appeared in your smile.' : 'Show us your smile.'}
-      </h1>
-      <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
-        {smileUnlocked
-          ? 'Your first JOY:D signal is glowing. Step through when you’re ready — inside, your smile stays the key.'
-          : statusCopy}
-      </p>
-      {smileStatus !== 'unavailable' && !smileUnlocked && (
-        <div className="mx-auto mt-7 flex flex-col items-center">
-          <div className="relative h-16 w-12 overflow-hidden rounded-t-[1.6rem] border-2 border-amber-100/40 bg-white/5 shadow-[0_0_18px_rgba(255,231,163,0.15)]">
-            <div
-              className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-amber-200 via-rose-300 to-fuchsia-300 transition-[height] duration-200"
-              style={{ height: `${Math.min(Math.round((smileScore / 0.45) * 100), 100)}%` }}
-            />
-            <div className="absolute right-2 top-1/2 size-1.5 -translate-y-1/2 rounded-full bg-purple-950/55" aria-hidden="true" />
-          </div>
-          <p className="mt-2 text-xs font-semibold tracking-wide text-white/55">
-            {smileScore >= 0.45 ? 'The little door is opening…' : 'Your smile fills the little door'}
-          </p>
-        </div>
-      )}
-      <div className="relative mt-7 inline-flex">
-        {smileUnlocked && !celebrationComplete && !reduceMotion && <UnlockBubbles />}
-        <button
-          type={smileUnlocked ? 'button' : undefined}
-          onClick={smileUnlocked ? onOpenPortal : undefined}
-          disabled={!smileUnlocked}
-          aria-label={smileUnlocked ? 'Open my first portal' : undefined}
-          className="relative z-10 overflow-hidden rounded-full p-px disabled:cursor-default"
-        >
-          {smileUnlocked && celebrationComplete && !reduceMotion && (
-            <motion.span
-              animate={{ rotate: 360 }}
-              transition={{ duration: 5.5, ease: 'linear', repeat: Infinity }}
-              className="absolute -inset-[140%] bg-[conic-gradient(from_0deg,transparent_0deg,transparent_70deg,rgba(255,255,255,0.16)_110deg,rgba(255,244,181,0.95)_135deg,rgba(255,255,255,0.18)_160deg,transparent_195deg,transparent_360deg)]"
-              aria-hidden="true"
-            />
-          )}
-          <motion.div
-            animate={
-              smileUnlocked && !celebrationComplete && !reduceMotion
-                ? {
-                    rotate: [0, -4, 4, -3, 3, 0],
-                    scale: [1, 1.08, 1],
-                    x: [0, -2, 2, -1, 1, 0],
-                  }
-                : undefined
-            }
-            transition={
-              smileUnlocked && !celebrationComplete && !reduceMotion
-                ? { duration: 2.4, ease: 'easeInOut' }
-                : undefined
-            }
-            onAnimationComplete={() => {
-              if (smileUnlocked && !celebrationComplete && !reduceMotion) {
-                onCelebrationComplete()
-              }
-            }}
-            className="relative inline-flex items-center gap-2 rounded-full bg-[#6b5874]/95 px-4 py-2 text-sm font-semibold text-amber-50 shadow-lg shadow-amber-200/10"
-          >
-            <Sparkles className="size-4" aria-hidden="true" />
-            {smileUnlocked
-              ? celebrationComplete
-                ? 'Enter your first JOY:D world'
-                : 'First door unlocked'
-              : smileError
-                ? 'Signal unavailable'
-                : 'Listening locally'}
-            {smileUnlocked && (
-              <motion.span
-                animate={reduceMotion || !celebrationComplete ? undefined : { opacity: [0.5, 1, 0.5], rotate: [0, 18, -12, 0] }}
-                transition={reduceMotion || !celebrationComplete ? undefined : { duration: 1.1, repeat: Infinity }}
-                className="text-base leading-none"
-                aria-hidden="true"
-              >
-                {celebrationComplete ? <ArrowRight className="size-4" /> : '✦'}
-              </motion.span>
-            )}
-          </motion.div>
-        </button>
       </div>
-      {smileError && (
-        <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-rose-100/70">
-          Refresh and try again if the signal does not begin.
-        </p>
-      )}
-      {smileUnlocked && joySignature && <JoySignatureCard signature={joySignature} />}
-    </motion.div>
+      <span className="w-12 shrink-0 text-right text-[11px] font-semibold text-white/80">{value}</span>
+    </div>
   )
 }
 
+// The Joy Signature profile: a creative reading of one specific smile — its
+// unique print, its ID, and the little measurements that composed it.
 function JoySignatureCard({ signature }: { signature: JoySignature }) {
-  const reduceMotion = useReducedMotion()
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 12, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: 0.18, duration: 0.45, ease: 'easeOut' }}
-      className="relative mx-auto mt-7 max-w-sm overflow-hidden rounded-3xl p-px text-left"
-    >
-      <motion.span
-        animate={reduceMotion ? undefined : { rotate: -360 }}
-        transition={reduceMotion ? undefined : { duration: 8.5, ease: 'linear', repeat: Infinity }}
-        className="absolute -inset-[100%] bg-[conic-gradient(from_0deg,transparent_0deg,transparent_85deg,rgba(176,227,255,0.14)_115deg,rgba(255,232,163,0.85)_145deg,rgba(255,255,255,0.16)_170deg,transparent_205deg,transparent_360deg)]"
-        aria-hidden="true"
-      />
-      <div className="relative rounded-[1.42rem] border border-white/15 bg-[#2a154b] p-5">
-        <p className="text-xs font-bold tracking-[0.18em] text-amber-100/80">YOUR JOY:D SMILE SIGNATURE</p>
-        <div className="mt-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="font-serif text-2xl font-bold text-white">{signature.wonderTitle}</p>
-            <p className="mt-1 text-sm text-white/65">{signature.shape} · {signature.signalPercent}% signal</p>
+    <section className="w-[min(88vw,22rem)] rounded-2xl border border-white/15 bg-[#241040]/92 p-4 text-left shadow-2xl shadow-black/40 backdrop-blur-md">
+      <div className="flex items-center gap-3.5">
+        <JoyPrint signature={signature} className="size-16 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-[9px] font-bold tracking-[0.2em] text-amber-100/70">YOUR JOY SIGNATURE</p>
+            <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
           </div>
-          <div className="flex -space-x-2" aria-label="Your color trail">
-            {signature.colorTrail.map((color) => (
-              <span
-                key={color}
-                className="size-7 rounded-full border-2 border-purple-950/50 shadow-sm"
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
+          <p className="mt-0.5 truncate font-serif text-lg font-black leading-tight text-white">{signature.wonderTitle}</p>
+          <p className="text-xs text-white/60">{signature.shape}</p>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3 text-xs text-white/50">
-          <span>Creative reading of this moment · not identity or emotion analysis</span>
-          <span className="shrink-0 font-semibold tracking-wider text-white/60">{signature.momentCode}</span>
-        </div>
-        <p className="mt-2 text-xs text-white/40">No camera frames or face data are captured, saved, or sent. Opening the portal uses this creative signature to form a world.</p>
       </div>
-    </motion.section>
+      <div className="mt-3 grid gap-1.5 border-t border-white/10 pt-3">
+        <SignatureStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
+        <SignatureStat
+          label="HOLD"
+          value={`${(signature.heldForMs / 1000).toFixed(1)}s`}
+          percent={(signature.heldForMs / 2000) * 100}
+        />
+        <SignatureStat
+          label="BLOOM"
+          value={signature.riseRate >= 0.35 ? 'quick' : 'gentle'}
+          percent={(signature.riseRate / 0.8) * 100}
+        />
+      </div>
+      <p className="mt-2.5 text-[10px] leading-relaxed text-white/40">
+        A creative reading of this one smile — its print belongs to this moment alone. Never identity, never emotion analysis. Nothing leaves your browser.
+      </p>
+    </section>
+  )
+}
+
+const enterSparks = Array.from({ length: 34 }, (_, index) => ({
+  angle: (index / 34) * Math.PI * 2 + ((index * 29) % 10) / 10,
+  distance: 140 + ((index * 53) % 220),
+  size: 3 + ((index * 17) % 4),
+  delay: ((index * 7) % 5) * 0.05,
+  color: ['#ffdf8e', '#ffb45e', '#fff3c4', '#f5a9c6'][index % 4],
+}))
+
+// A burst of golden sparks the instant a smile carries the traveler through.
+function EnterSparkles() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40 grid place-items-center" aria-hidden="true">
+      {enterSparks.map((spark, index) => (
+        <motion.span
+          key={index}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 0.4 }}
+          animate={{
+            x: Math.cos(spark.angle) * spark.distance,
+            y: Math.sin(spark.angle) * spark.distance,
+            opacity: [1, 1, 0],
+            scale: [0.4, 1.15, 0.5],
+          }}
+          transition={{ duration: 0.95, delay: spark.delay, ease: 'easeOut' }}
+          className="absolute rounded-full [grid-area:1/1]"
+          style={{
+            width: spark.size,
+            height: spark.size,
+            background: spark.color,
+            boxShadow: `0 0 12px 3px ${spark.color}cc`,
+          }}
+        />
+      ))}
+    </div>
   )
 }
 
@@ -503,63 +583,5 @@ function UnlockBubbles() {
         />
       ))}
     </span>
-  )
-}
-
-function DeniedState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <motion.div
-      key="denied"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      className="mt-7"
-    >
-      <CameraFrame>
-        <div className="flex h-full flex-col items-center justify-center p-8">
-          <span className="text-6xl">☁️</span>
-          <span className="mt-5 text-sm font-semibold text-white/75">The window stayed closed</span>
-        </div>
-      </CameraFrame>
-      <h1 className="mt-8 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-        No worries at all.
-      </h1>
-      <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
-        JOY:D needs camera permission to begin. You can try again whenever it feels right.
-      </p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="mt-8 inline-flex items-center gap-3 rounded-full bg-amber-100 px-6 py-3.5 font-bold text-purple-950 shadow-lg shadow-amber-950/20 transition hover:-translate-y-0.5 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
-      >
-        <RefreshCw className="size-5" aria-hidden="true" />
-        Try camera again
-      </button>
-    </motion.div>
-  )
-}
-
-function UnsupportedState() {
-  return (
-    <motion.div
-      key="unsupported"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 10 }}
-      className="mt-7"
-    >
-      <CameraFrame>
-        <div className="flex h-full flex-col items-center justify-center p-8">
-          <span className="text-6xl">🔮</span>
-          <span className="mt-5 text-sm font-semibold text-white/75">This doorway needs a camera</span>
-        </div>
-      </CameraFrame>
-      <h1 className="mt-8 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-        Try a camera-enabled browser.
-      </h1>
-      <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
-        JOY:D opens its first portal through your camera. Localhost works while you build; a deployed version will need HTTPS.
-      </p>
-    </motion.div>
   )
 }

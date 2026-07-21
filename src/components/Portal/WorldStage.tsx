@@ -1,5 +1,6 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { JoyCapsule, WorldSceneBiome, WorldSceneElement } from '../../data/joyCapsule'
 import { hashWorld, resolveScene } from '../../data/joyScene'
 import type { WorldSceneImages } from '../../data/joySceneImages'
@@ -15,6 +16,8 @@ type WorldSecretProps = {
   capsule: JoyCapsule
   hiddenRevealed: boolean
   onRevealHidden: () => void
+  wowCharge?: number
+  revealedImage?: string | null
 }
 
 type BiomeStyle = {
@@ -225,8 +228,15 @@ export function WorldStage({ capsule, images, smileScore = 0, colorTrail }: Worl
   )
 }
 
-export function WorldSecret({ capsule, hiddenRevealed, onRevealHidden }: WorldSecretProps) {
+export function WorldSecret({
+  capsule,
+  hiddenRevealed,
+  onRevealHidden,
+  wowCharge = 0,
+  revealedImage,
+}: WorldSecretProps) {
   const reduceMotion = useReducedMotion()
+  const [toastVisible, setToastVisible] = useState(false)
   const scene = resolveScene(capsule)
   const style = biomeStyles[scene.biome]
   const seed = hashWorld(`${capsule.worldName}:${capsule.visualDirection}`)
@@ -234,6 +244,18 @@ export function WorldSecret({ capsule, hiddenRevealed, onRevealHidden }: WorldSe
   const left = Math.min(88, Math.max(10, anchor.x + ((seed >> 5) % 11) - 5))
   const top = Math.min(82, Math.max(12, anchor.y + ((seed >> 8) % 11) - 5))
   const hiddenLabel = capsule.surprise.length > 82 ? `${capsule.surprise.slice(0, 79)}…` : capsule.surprise
+  const transformed = hiddenRevealed && Boolean(revealedImage)
+
+  // The found-message drifts away on its own so it never blocks the journey.
+  useEffect(() => {
+    if (!hiddenRevealed) {
+      setToastVisible(false)
+      return
+    }
+    setToastVisible(true)
+    const timer = setTimeout(() => setToastVisible(false), 7000)
+    return () => clearTimeout(timer)
+  }, [hiddenRevealed])
 
   return (
     <>
@@ -241,26 +263,61 @@ export function WorldSecret({ capsule, hiddenRevealed, onRevealHidden }: WorldSe
         type="button"
         onClick={onRevealHidden}
         initial={{ opacity: 0, scale: 0.2 }}
-        animate={hiddenRevealed ? { opacity: 0.4, scale: 0.84 } : reduceMotion ? { opacity: 1, scale: 1 } : { opacity: 1, scale: [0.8, 1.16, 0.8], rotate: [0, 8, -5, 0] }}
-        transition={hiddenRevealed || reduceMotion ? { duration: 0.3 } : { duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+        animate={
+          hiddenRevealed
+            ? { opacity: transformed ? 0 : 0.4, scale: transformed ? 0.3 : 0.84 }
+            : reduceMotion
+              ? { opacity: 1, scale: 1 }
+              : { opacity: 1, scale: [0.8, 1.16, 0.8], rotate: [0, 8, -5, 0] }
+        }
+        transition={hiddenRevealed || reduceMotion ? { duration: 0.45 } : { duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         className="absolute z-20 grid size-16 place-items-center rounded-[42%] border-2 border-white/85 bg-white/15 text-3xl shadow-[0_0_0_6px_rgba(255,231,163,0.17),0_0_35px_12px_rgba(255,220,119,0.55)] backdrop-blur-sm focus:outline-none focus:ring-4 focus:ring-white/60"
-        style={{ color: style.glow, left: `${left}%`, top: `${top}%` }}
-        aria-label={hiddenRevealed ? 'Hidden wonder discovered' : `Reveal hidden wonder: ${hiddenLabel}`}
+        style={{
+          color: style.glow,
+          left: `${left}%`,
+          top: `${top}%`,
+          filter: `brightness(${1 + wowCharge * 0.9}) saturate(${1 + wowCharge * 0.5})`,
+        }}
+        aria-label={hiddenRevealed ? 'Hidden wonder discovered' : `Reveal the hidden wonder with a WOW face — or tap: ${hiddenLabel}`}
         disabled={hiddenRevealed}
       >
         <Sparkles className="size-7" aria-hidden="true" />
       </motion.button>
-      {hiddenRevealed && (
+      {transformed && revealedImage && (
         <motion.div
-          initial={{ opacity: 0, y: 14, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="pointer-events-none absolute bottom-7 left-1/2 z-20 w-[min(24rem,calc(100%-3rem))] -translate-x-1/2 rounded-3xl border border-white/35 bg-[#1f123f]/72 p-4 text-center shadow-2xl backdrop-blur-md"
-          role="status"
+          initial={{ opacity: 0, scale: 0.25 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: reduceMotion ? 0.3 : 1.1, ease: 'easeOut' }}
+          className="pointer-events-none absolute z-10 w-[min(30vw,18rem)]"
+          style={{ left: `${left}%`, top: `${top}%`, translate: '-50% -50%' }}
+          aria-hidden="true"
         >
-          <p className="text-xs font-bold tracking-[0.2em] text-amber-100">YOU FOUND IT</p>
-          <p className="mt-2 font-serif text-base italic text-white">{hiddenLabel}</p>
+          <motion.div
+            animate={reduceMotion ? undefined : { y: [0, -14, 0], rotate: [-1.5, 1.5, -1.5] }}
+            transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <img
+              src={revealedImage}
+              alt=""
+              className="h-auto w-full object-contain drop-shadow-[0_0_28px_rgba(255,231,163,0.45)]"
+            />
+          </motion.div>
         </motion.div>
       )}
+      <AnimatePresence>
+        {toastVisible && (
+          <motion.div
+            initial={{ opacity: 0, y: 14, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="pointer-events-none absolute bottom-32 left-1/2 z-20 w-[min(24rem,calc(100%-3rem))] -translate-x-1/2 rounded-3xl border border-white/35 bg-[#1f123f]/72 p-4 text-center shadow-2xl backdrop-blur-md"
+            role="status"
+          >
+            <p className="text-xs font-bold tracking-[0.2em] text-amber-100">YOU FOUND IT</p>
+            <p className="mt-2 font-serif text-base italic text-white">{hiddenLabel}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
