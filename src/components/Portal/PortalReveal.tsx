@@ -375,8 +375,8 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
                   <Sparkles className="size-4" aria-hidden="true" />
                   THE FIRST LITTLE DOOR
                 </p>
-                <h1 id="portal-title" className="mt-4 font-serif text-4xl font-black tracking-[-0.05em] text-white sm:text-5xl">
-                  Your smile opened a way in.
+                <h1 id="portal-title" className="mt-4 font-serif text-4xl font-black leading-[0.94] tracking-[-0.05em] text-white sm:text-5xl">
+                  Your smile<br />opened a way in.
                 </h1>
                 <p className="mx-auto mt-4 max-w-sm text-base leading-relaxed text-white/70">
                   A new JOY:D world is gathering just beyond this glow. Its colours carry your {signature.shape.toLowerCase()}.
@@ -506,7 +506,16 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
                   />
                   <span className="relative inline-flex items-center gap-2">
                     {isDeepening ? 'Following the glimmer…' : smileCharge > 0 ? 'Your smile is opening it…' : 'Go deeper'}
-                    {isDeepening ? <Sparkles className="size-4 animate-pulse" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}
+                    {isDeepening ? (
+                      <motion.span
+                        animate={reduceMotion ? undefined : { rotate: 360 }}
+                        transition={{ duration: 1, ease: 'linear', repeat: Infinity }}
+                        className="inline-flex"
+                        aria-hidden="true"
+                      >
+                        <Sparkles className="size-4" />
+                      </motion.span>
+                    ) : <ArrowRight className="size-4" aria-hidden="true" />}
                   </span>
                 </button>
               ) : (
@@ -870,14 +879,42 @@ const worldFallbackGradients = [
   'from-[#7a2f56] via-[#c65b62] to-[#f5a24f]',
 ]
 
+const cosmicStars = Array.from({ length: 96 }, (_, index) => {
+  const sample = (multiplier: number, offset: number) => ((index * multiplier + offset) % 997) / 997
+  return {
+    left: `${(sample(173, 59) * 98 + 1).toFixed(2)}%`,
+    top: `${(sample(419, 137) * 96 + 2).toFixed(2)}%`,
+    size: 1 + sample(277, 211) * 2.7,
+    opacity: 0.22 + sample(331, 307) * 0.7,
+    delay: sample(487, 89) * -6,
+    duration: 2.8 + sample(613, 401) * 4.8,
+    color: ['#ffffff', '#fff0bc', '#dfe5ff', '#efccff'][index % 4],
+  }
+})
+
 function CosmicBackdrop({ reduceMotion }: { reduceMotion: boolean }) {
   return (
     <>
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,#22143f_0%,#130b28_55%,#080414_100%)]" />
-      <div
-        className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_18%_24%,rgba(255,255,255,0.55)_0_1px,transparent_1.6px),radial-gradient(circle_at_63%_57%,rgba(255,255,255,0.32)_0_1px,transparent_1.6px),radial-gradient(circle_at_41%_82%,rgba(255,255,255,0.4)_0_1px,transparent_1.6px),radial-gradient(circle_at_84%_18%,rgba(255,255,255,0.34)_0_1px,transparent_1.6px),radial-gradient(circle_at_9%_66%,rgba(255,255,255,0.3)_0_1px,transparent_1.6px)] [background-size:150px_160px,120px_130px,170px_150px,130px_180px,110px_120px]"
-        aria-hidden="true"
-      />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        {cosmicStars.map((star, index) => (
+          <motion.span
+            key={index}
+            animate={reduceMotion ? undefined : { opacity: [star.opacity * 0.35, star.opacity, star.opacity * 0.45], scale: [0.75, 1.25, 0.85] }}
+            transition={{ duration: star.duration, repeat: Infinity, repeatType: 'mirror', delay: star.delay, ease: 'easeInOut' }}
+            className="absolute rounded-full"
+            style={{
+              left: star.left,
+              top: star.top,
+              width: star.size,
+              height: star.size,
+              opacity: star.opacity,
+              backgroundColor: star.color,
+              boxShadow: star.size > 2.5 ? `0 0 ${star.size * 3}px ${star.color}88` : undefined,
+            }}
+          />
+        ))}
+      </div>
       {!reduceMotion && (
         <motion.div
           animate={{ opacity: [0.25, 0.5, 0.25] }}
@@ -910,18 +947,43 @@ function TrailComet({ colors, className, reverse }: { colors: string[]; classNam
 }
 
 function StoryStat({ label, value, percent }: { label: string; value: string; percent: number }) {
+  const [displayPercent, setDisplayPercent] = useState(0)
+  const displayPercentRef = useRef(0)
+  const clampedPercent = Math.min(Math.max(percent, 4), 100)
+
+  useEffect(() => {
+    const startValue = displayPercentRef.current
+    const startedAt = performance.now()
+    const duration = 1000
+    let frame = 0
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - startedAt) / duration, 1)
+      const eased = 1 - (1 - progress) ** 3
+      const nextValue = Math.round(startValue + (clampedPercent - startValue) * eased)
+      displayPercentRef.current = nextValue
+      setDisplayPercent(nextValue)
+      if (progress < 1) frame = requestAnimationFrame(tick)
+    }
+
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [clampedPercent])
+
+  const rollingValue = value.endsWith('%') ? `${displayPercent}%` : value
+
   return (
     <div className="flex items-center gap-3">
       <span className="w-24 shrink-0 text-left text-[11px] font-bold tracking-[0.16em] text-amber-100/70">{label}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${Math.min(Math.max(percent, 4), 100)}%` }}
+          animate={{ width: `${clampedPercent}%` }}
           transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
           className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
         />
       </div>
-      <span className="w-14 shrink-0 text-right text-sm font-semibold text-white/85">{value}</span>
+      <span className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-white/85">{rollingValue}</span>
     </div>
   )
 }
@@ -1399,7 +1461,7 @@ function SmileStory({
               onClick={() => setChapter((c) => c + 1)}
               className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-6 py-3 text-sm font-bold text-purple-950 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/30"
             >
-              {chapter === 2 ? 'Find another smile' : 'Next'}
+              {chapter === 2 ? 'Match my smile' : 'Next'}
               <ArrowRight className="size-4" aria-hidden="true" />
             </button>
           ) : (
