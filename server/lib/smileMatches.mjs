@@ -50,11 +50,16 @@ function isSafeMatchRequest(value) {
     && worlds.every(isSafeWorld)
 }
 
+// Weighs every trait shown on the traveler card (brightness, hold, bloom)
+// plus color trail overlap, so the displayed percentage actually tracks how
+// similar the two cards look rather than mostly reflecting shape alone.
 function matchScore(first, second) {
   const shapeScore = first.shape === second.shape ? 1 : 0
   const signalScore = 1 - Math.min(Math.abs(first.signalPercent - second.signalPercent), 100) / 100
+  const holdScore = 1 - Math.min(Math.abs(first.heldForMs - second.heldForMs), 4000) / 4000
+  const bloomScore = 1 - Math.min(Math.abs(first.riseRate - second.riseRate), 1) / 1
   const sharedColors = first.colorTrail.filter((color) => second.colorTrail.includes(color)).length / 3
-  return shapeScore * 0.55 + signalScore * 0.35 + sharedColors * 0.1
+  return shapeScore * 0.35 + signalScore * 0.25 + holdScore * 0.15 + bloomScore * 0.15 + sharedColors * 0.1
 }
 
 function supabaseConfig() {
@@ -183,20 +188,20 @@ export async function handleSmileMatchRequest(requestBody) {
       return { status: 200, body: { matchSource: 'waiting' } }
     }
 
+    const candidateTraveler = (candidate) => ({
+      shape: candidate.shape,
+      signalPercent: candidate.signal_percent,
+      colorTrail: candidate.color_trail,
+      heldForMs: Number.isInteger(candidate.held_for_ms) ? candidate.held_for_ms : 700,
+      riseRate: typeof candidate.rise_rate === 'number' ? candidate.rise_rate : 0.35,
+    })
+
     const match = candidates.reduce((closest, candidate) => {
-      const candidateScore = matchScore(currentTraveler, {
-        shape: candidate.shape,
-        signalPercent: candidate.signal_percent,
-        colorTrail: candidate.color_trail,
-      })
+      const candidateScore = matchScore(currentTraveler, candidateTraveler(candidate))
       return candidateScore > closest.score ? { profile: candidate, score: candidateScore } : closest
     }, {
       profile: candidates[0],
-      score: matchScore(currentTraveler, {
-        shape: candidates[0].shape,
-        signalPercent: candidates[0].signal_percent,
-        colorTrail: candidates[0].color_trail,
-      }),
+      score: matchScore(currentTraveler, candidateTraveler(candidates[0])),
     }).profile
 
     const matchedTraveler = profileToTraveler(match)
@@ -217,7 +222,11 @@ export async function handleSmileMatchRequest(requestBody) {
           wonderTitle: matchedTraveler.wonderTitle,
         },
         sharedShape: matchedTraveler.shape,
-        similarity: Math.round(72 + matchScore(currentTraveler, matchedTraveler) * 26),
+        // The true weighted similarity, 0-100 — no artificial floor. A
+        // previous version always reported 72-98%, so even a poor match
+        // read as a strong one; this now tracks what the traveler card
+        // actually shows (brightness, hold, bloom, shape, color trail).
+        similarity: Math.round(matchScore(currentTraveler, matchedTraveler) * 100),
       },
     }
   } catch (error) {

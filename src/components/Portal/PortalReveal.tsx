@@ -586,13 +586,13 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         {phase === 'world' && activeCapsule && capsuleStatus === 'ready' && (
           <button
             type="button"
-            onClick={() => readCapsuleAloud(activeCapsule)}
-            disabled={isReading}
-            aria-label={isReading ? 'The world is speaking' : 'Hear this world'}
-            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
+            onClick={() => (isReading ? stopReading() : readCapsuleAloud(activeCapsule))}
+            aria-label={isReading ? 'Stop the reading' : 'Hear this world'}
+            aria-pressed={isReading}
+            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
           >
             <Speech className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{isReading ? 'The world is speaking…' : 'Hear this world'}</span>
+            <span className="hidden sm:inline">{isReading ? 'Stop reading' : 'Hear this world'}</span>
           </button>
         )}
       </div>
@@ -882,21 +882,25 @@ function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: (
       isLocalHost ? (
         <>This world needs an AI provider key before it can bloom. Add an OpenAI or OpenRouter key to your local <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then open the portal again.</>
       ) : (
-        <>This world needs an AI provider key before it can bloom. Add <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_API_KEY</code> or <code className="rounded bg-white/10 px-1.5 py-0.5">OPENAI_API_KEY</code> in the host’s environment settings, then redeploy.</>
+        <>The world-maker isn’t reachable right now. Please check back again soon.</>
       )
     ) : status === 'quota-exhausted' ? (
-      <>This OpenAI project has no available API quota. Add credits, raise the project budget, or use an OpenRouter key instead.</>
+      isLocalHost ? (
+        <>This OpenAI project has no available API quota. Add credits, raise the project budget, or use an OpenRouter key instead.</>
+      ) : (
+        <>The world-maker has run out of steam for the moment. Please check back again soon.</>
+      )
     ) : status === 'service-offline' ? (
       isLocalHost ? (
         <>The local JOY:D capsule service is not running. Stop the old dev server and restart this project with <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
       ) : (
-        <>JOY:D could not reach its world-making service. Check the latest deploy and server logs, then try again.</>
+        <>JOY:D couldn’t reach its world-making service. Please try again in a moment.</>
       )
     ) : status === 'auth-failed' ? (
       isLocalHost ? (
         <>JOY:D can reach the AI provider, but it cannot verify the key. Check the key in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then restart <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
       ) : (
-        <>JOY:D can reach the AI provider, but it cannot verify the key. In Vercel → Project → Settings → Environment Variables, confirm <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_API_KEY</code> (and <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code>) for Production, then redeploy.</>
+        <>JOY:D can’t verify its connection to the world-maker right now. Please try again shortly.</>
       )
     ) : status === 'rate-limited' ? (
       <>The world-maker is busy right now. Wait a moment, then try gathering this world again.</>
@@ -904,7 +908,7 @@ function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: (
       isLocalHost ? (
         <>This model is not available right now. Check <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, restart, and try again.</>
       ) : (
-        <>This chat model is blocked or unavailable on OpenRouter. In Vercel → Environment Variables, set <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL=google/gemini-2.5-flash</code> (not an <code className="rounded bg-white/10 px-1.5 py-0.5">openai/gpt-*</code> chat model), confirm <code className="rounded bg-white/10 px-1.5 py-0.5">JOYD_TEXT_PROVIDER=openrouter</code>, then redeploy.</>
+        <>The world-maker is taking a breather. Please try again in a moment.</>
       )
     ) : (
       <>A little stardust got tangled. Try gathering this world again.</>
@@ -1127,7 +1131,7 @@ function TravelerFlipCard({
         className="relative h-full w-full [transform-style:preserve-3d]"
       >
         {/* Signature composition side (shown first). */}
-        <div className="absolute inset-0 flex flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
+        <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
             <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
@@ -1148,9 +1152,9 @@ function TravelerFlipCard({
         </div>
 
         {/* Worlds side. */}
-        <div className="absolute inset-0 flex rotate-y-180 flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <div className="absolute inset-0 flex rotate-y-180 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label} · 3 WORLDS</p>
-          <ol className="mt-2 grid flex-1 gap-2">
+          <ol className="mt-2 grid min-h-0 flex-1 gap-2 overflow-y-auto">
             {worlds.slice(0, 3).map((world, index) => {
               const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
               const mark = spriteMarks[world.sprite ?? ''] ?? '✦'
