@@ -607,11 +607,16 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
                 ? 'Smile signal resting — tapping works too'
                 : 'Your smile is lighting this world'}
           </p>
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
-              style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
-            />
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
+                style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.08em] text-amber-100/90">
+              {Math.round(Math.min(smileScore, 1) * 100)}%
+            </span>
           </div>
           <p className="mt-1.5 text-[10px] leading-snug text-white/45">
             Camera stays in your browser only. Leaving the portal closes it.
@@ -1027,6 +1032,28 @@ function MeetBurst() {
   )
 }
 
+function WorldMatchList({
+  label,
+  worlds,
+}: {
+  label: string
+  worlds: Array<{ quote: string; worldName: string }>
+}) {
+  return (
+    <section className="rounded-2xl border border-white/12 bg-white/5 p-3">
+      <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
+      <ol className="mt-2 grid gap-2">
+        {worlds.map((world, index) => (
+          <li key={`${world.worldName}-${index}`}>
+            <p className="font-serif text-xs font-black leading-tight text-white">{world.worldName}</p>
+            <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-white/50">“{world.quote}”</p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
 function SmileStory({
   signature,
   capsules,
@@ -1047,7 +1074,7 @@ function SmileStory({
   const reduceMotion = useReducedMotion()
   const [chapter, setChapter] = useState(0)
   const [match, setMatch] = useState<SmileMatch | null>(null)
-  const [matchStatus, setMatchStatus] = useState<'idle' | 'searching' | 'error'>('idle')
+  const [matchStatus, setMatchStatus] = useState<'idle' | 'searching' | 'waiting' | 'error'>('idle')
   const [smileCharge, setSmileCharge] = useState(0)
   const [shareMessage, setShareMessage] = useState('')
   const smileScoreRef = useRef(smileScore)
@@ -1076,23 +1103,32 @@ function SmileStory({
     searchStartedRef.current = true
     setMatchStatus('searching')
     try {
-      const [result] = await Promise.all([findSmileMatch(signature), delay(reduceMotion ? 300 : 1800)])
-      setMatch(result)
-      playConnectionChime()
-      setMatchStatus('idle')
+      const [result] = await Promise.all([
+        findSmileMatch(signature, capsules.map(({ quote, worldName }) => ({ quote, worldName }))),
+        delay(reduceMotion ? 300 : 1800),
+      ])
+      if (result.matchSource === 'waiting') {
+        setMatchStatus('waiting')
+      } else {
+        setMatch(result)
+        playConnectionChime()
+        setMatchStatus('idle')
+      }
     } catch (error) {
       searchStartedRef.current = false
       setMatchStatus('error')
-      if (!(error instanceof SmileMatchError)) {
+      if (error instanceof SmileMatchError) {
+        setShareMessage(error.message)
+      } else {
         setShareMessage('The matching constellation needs another moment.')
       }
     }
-  }, [reduceMotion, signature])
+  }, [capsules, reduceMotion, signature])
 
   // On the final chapter, a held smile reaches across the dark to find another
   // traveler. The camera is still watching from inside the portal.
   useEffect(() => {
-    if (chapter !== 3 || match || matchStatus === 'searching') return
+    if (chapter !== 3 || match || matchStatus === 'searching' || matchStatus === 'waiting') return
     const tick = setInterval(() => {
       const score = smileScoreRef.current
       if (score >= 0.42) {
@@ -1125,17 +1161,17 @@ function SmileStory({
     )
   }
 
-  const otherSignature: JoySignature | null = match
+  const otherSignature: JoySignature | null = match?.matchSource === 'live'
     ? {
-        colorTrail: (match.matchColorTrail.length >= 3
-          ? match.matchColorTrail.slice(0, 3)
+        colorTrail: ((match.matchColorTrail?.length ?? 0) >= 3
+          ? match.matchColorTrail!.slice(0, 3)
           : ['#f7b7d7', '#a9dfff', '#fff0a8']) as [string, string, string],
-        creativeSeed: match.similarity * 97,
-        heldForMs: 700 + match.similarity * 7,
-        momentCode: `JOY-${match.sharedShape.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity}`,
+        creativeSeed: (match.similarity ?? 0) * 97,
+        heldForMs: 700 + (match.similarity ?? 0) * 7,
+        momentCode: `JOY-${(match.sharedShape ?? 'JOY').replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity ?? 0}`,
         riseRate: 0.4,
-        shape: match.sharedShape,
-        signalPercent: match.similarity,
+        shape: match.sharedShape ?? 'Gentle Bloom',
+        signalPercent: match.similarity ?? 0,
         wonderTitle: 'A fellow traveler',
       }
     : null
@@ -1359,7 +1395,7 @@ function SmileStory({
                     transition={{ delay: 1.2, duration: 0.6 }}
                     className="mt-3 text-sm text-white/70"
                   >
-                    Two strangers. One {match.sharedShape.toLowerCase()} frequency.
+                    Two strangers. One {(match.sharedShape ?? 'gentle bloom').toLowerCase()} frequency.
                   </motion.p>
                   <motion.p
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -1367,13 +1403,15 @@ function SmileStory({
                     transition={{ delay: 1.4, duration: 0.5 }}
                     className="mt-4 font-serif text-5xl font-black text-amber-100"
                   >
-                    {match.similarity}%
+                    {match.similarity ?? 0}%
                   </motion.p>
                   <p className="text-xs font-semibold tracking-[0.2em] text-amber-100/70">JOY:D RESONANCE</p>
+                  <div className="mt-5 grid w-full max-w-sm grid-cols-2 gap-3 text-left">
+                    <WorldMatchList label="YOUR THREE WORLDS" worlds={capsules} />
+                    <WorldMatchList label="THEIR THREE WORLDS" worlds={match.matchWorlds ?? []} />
+                  </div>
                   <p className="mt-4 max-w-xs text-xs leading-relaxed text-white/45">
-                    {match.matchSource === 'live'
-                      ? 'A live anonymous JOY:D traveler is nearby. No profiles or identities are revealed.'
-                      : 'A waiting demo traveler helped awaken this local JOY:D universe.'}
+                    A real anonymous traveler. Only your playful signature and AI-generated world summaries met here—never either person’s identity.
                   </p>
                   <button
                     type="button"
@@ -1408,6 +1446,27 @@ function SmileStory({
                   <p className="mt-6 font-serif text-2xl font-black text-white">Reaching across the dark…</p>
                   <p className="mt-2 text-sm text-white/60">Searching the JOY:D night sky.</p>
                 </div>
+              ) : matchStatus === 'waiting' ? (
+                <div className="flex max-w-sm flex-col items-center">
+                  <TrailComet colors={signature.colorTrail} className="mb-6" />
+                  <h2 className="font-serif text-4xl font-black leading-tight tracking-[-0.03em] text-white">
+                    Your smile is<br />waiting to meet another.
+                  </h2>
+                  <p className="mt-4 text-sm leading-relaxed text-white/70">
+                    There is no live match yet. Your anonymous signature and three AI-generated worlds will wait for up to seven days.
+                  </p>
+                  <p className="mt-4 max-w-xs text-xs leading-relaxed text-white/45">
+                    No face, camera frame, name, account, or location is stored. A future traveler can meet the worlds your smile opened.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onBeginAgain}
+                    className="mt-7 inline-flex items-center gap-2 rounded-full bg-amber-100 px-6 py-3 text-sm font-bold text-purple-950 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/30"
+                  >
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                    Begin a new journey
+                  </button>
+                </div>
               ) : (
                 <div className="flex w-full flex-col items-center">
                   <p className="text-xs font-bold tracking-[0.3em] text-amber-100/80">ONE SMILE LEFT TO GIVE</p>
@@ -1437,10 +1496,12 @@ function SmileStory({
                     or tap to find another
                   </button>
                   <p className="mt-5 max-w-xs text-[11px] leading-relaxed text-white/40">
-                    Only this playful signature is compared. No face, camera frame, name, account, or location is used.
+                    By continuing, you opt in to share this playful signature and your three AI-generated world summaries for up to seven days. No face, camera frame, name, account, or location is used.
                   </p>
                   {matchStatus === 'error' && (
-                    <p className="mt-3 text-xs text-rose-100/85">The matching constellation needs another moment. Please try again.</p>
+                    <p className="mt-3 text-xs text-rose-100/85">
+                      {shareMessage || 'The matching constellation needs another moment. Please try again.'}
+                    </p>
                   )}
                 </div>
               )}
@@ -1450,7 +1511,7 @@ function SmileStory({
       </div>
 
       {/* Navigation — hidden on the connection chapter once matching begins. */}
-      {!(chapter === 3 && (match || matchStatus === 'searching')) && (
+      {!(chapter === 3 && (match || matchStatus === 'searching' || matchStatus === 'waiting')) && (
         <div className="relative z-20 flex items-center justify-between px-6 pb-7">
           <button
             type="button"

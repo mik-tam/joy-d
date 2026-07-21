@@ -132,7 +132,7 @@ function SceneSprite({
           <img
             src={imageUrl}
             alt=""
-            className="h-auto w-full object-contain drop-shadow-[0_16px_28px_rgba(9,4,25,0.4)]"
+            className="h-auto w-full object-contain drop-shadow-[0_10px_24px_rgba(9,4,25,0.55)] [filter:drop-shadow(0_0_10px_rgba(255,244,214,0.28))]"
             style={{ transform: element.flip ? 'scaleX(-1)' : undefined }}
           />
         </motion.div>
@@ -241,8 +241,8 @@ export function WorldSecret({
   const style = biomeStyles[scene.biome]
   const seed = hashWorld(`${capsule.worldName}:${capsule.visualDirection}`)
   const anchor = scene.elements[seed % scene.elements.length]
-  const left = Math.min(88, Math.max(10, anchor.x + ((seed >> 5) % 11) - 5))
-  const top = Math.min(82, Math.max(12, anchor.y + ((seed >> 8) % 11) - 5))
+  const left = Math.min(74, Math.max(28, anchor.x + ((seed >> 5) % 11) - 5))
+  const top = Math.min(64, Math.max(28, anchor.y + ((seed >> 8) % 11) - 5))
   const hiddenLabel = capsule.surprise.length > 82 ? `${capsule.surprise.slice(0, 79)}…` : capsule.surprise
   const transformed = hiddenRevealed && Boolean(revealedImage)
 

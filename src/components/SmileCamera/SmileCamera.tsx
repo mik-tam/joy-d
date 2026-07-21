@@ -46,6 +46,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     videoRef,
     onSmileDetected: handleSmileDetected,
   })
+  const smileMeterPercent = Math.min(Math.round((smileScore / 0.45) * 100), 100)
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -314,9 +315,12 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
               {!smileUnlocked && smileStatus !== 'unavailable' && (
                 <div
                   className="pointer-events-none absolute inset-x-0 bottom-0 transition-[height] duration-200"
-                  style={{ height: `${Math.min(Math.round((smileScore / 0.45) * 100), 100)}%` }}
+                  style={{ height: `${smileMeterPercent}%` }}
                 >
                   <div className="absolute inset-x-4 top-0 h-1 rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 shadow-[0_0_16px_4px_rgba(253,186,150,0.7)]" />
+                  <span className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-[calc(100%+0.55rem)] rounded-full border border-amber-100/35 bg-[#241040]/85 px-3 py-1 text-xs font-black tabular-nums tracking-[0.12em] text-amber-50 shadow-[0_2px_12px_rgba(20,8,42,0.55)] backdrop-blur">
+                    {smileMeterPercent}%
+                  </span>
                   <div className="absolute inset-0 bg-gradient-to-t from-amber-200/80 via-rose-300/55 to-fuchsia-300/30" />
                 </div>
               )}
