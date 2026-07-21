@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, HeartHandshake, RefreshCw, Share2, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, HeartHandshake, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { JoySignature } from '../SmileCamera/createJoySignature'
+import { bloomLabel, type JoySignature } from '../SmileCamera/createJoySignature'
 import type { SmileDetectionStatus } from '../SmileCamera/useSmileDetection'
 import {
   generateJoyCapsule,
@@ -13,6 +13,7 @@ import { saveVoyage } from '../../data/joyJournal'
 import { shareJoyStoryCard } from '../../data/joyStoryCard'
 import { generateSceneImages, generateSurpriseImage, type WorldSceneImages } from '../../data/joySceneImages'
 import { playConnectionChime, playDiscoveryChime, playHiddenWonderSound, setJoySoundsEnabled, startWorldSoundscape, stopJoySounds, stopWorldSoundscape } from '../../data/joySounds'
+import { speakJoyWorld, stopJoyVoice, warmJoyVoices } from '../../data/joyVoice'
 import { WorldSecret, WorldStage } from './WorldStage'
 import { JoyPrint } from '../JoyPrint'
 
@@ -263,7 +264,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
 
   useEffect(() => () => {
     stopJoySounds()
-    window.speechSynthesis?.cancel()
+    stopJoyVoice()
+  }, [])
+
+  useEffect(() => {
+    warmJoyVoices()
   }, [])
 
   useEffect(() => {
@@ -283,20 +288,17 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   }
 
   const stopReading = () => {
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
+    stopJoyVoice()
     setIsReading(false)
   }
 
   const readCapsuleAloud = (capsule: JoyCapsule) => {
-    if (!('speechSynthesis' in window)) return
     stopReading()
-    const utterance = new SpeechSynthesisUtterance(`${capsule.worldName}. ${capsule.story} ${capsule.quote}`)
-    utterance.rate = 0.88
-    utterance.pitch = 1.08
-    utterance.onend = () => setIsReading(false)
-    utterance.onerror = () => setIsReading(false)
     setIsReading(true)
-    window.speechSynthesis.speak(utterance)
+    speakJoyWorld(capsule, {
+      onDone: () => setIsReading(false),
+      onError: () => setIsReading(false),
+    })
   }
 
   const revealHiddenWonder = () => {
@@ -451,7 +453,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: reduceMotion ? 0 : 0.9, duration: 0.7 }}
-            className="pointer-events-none absolute inset-x-0 top-12 z-10 mx-auto max-w-2xl px-16 text-center"
+            className="pointer-events-none absolute inset-x-0 top-14 z-10 mx-auto max-w-2xl px-14 text-center sm:top-12 sm:px-16"
           >
             <p className="text-[10px] font-bold tracking-[0.3em] text-white/70 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]">
               DOOR {discoveryNumber} OF 3
@@ -471,7 +473,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: reduceMotion ? 0 : 1.2, duration: 0.6 }}
-            className="absolute inset-x-0 bottom-6 z-10 flex flex-col items-center gap-2.5 px-6"
+            className="absolute inset-x-0 bottom-16 z-10 flex flex-col items-center gap-2.5 px-6 sm:bottom-6"
           >
             {deepeningError && (
               <p className="max-w-sm rounded-xl bg-rose-100/10 px-3 py-2 text-center text-xs leading-relaxed text-rose-50/85 backdrop-blur">
@@ -540,7 +542,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
                 </button>
               )}
             </div>
-            <p className="text-xs leading-relaxed text-white/45 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]">
+            <p className="hidden text-xs leading-relaxed text-white/45 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)] sm:block">
               {canGoDeeper
                 ? 'A held smile charges the next door · a WOW face reveals the hidden wonder. Tapping works too.'
                 : 'One long smile gathers your Joy Story · a WOW face reveals the hidden wonder. Tapping works too.'}
@@ -562,66 +564,66 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
       <button
         type="button"
         onClick={onClose}
-        className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+        aria-label="Return to my smile"
+        className="absolute left-3 top-3 z-20 inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:left-5 sm:top-5 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
-        Return to my smile
+        <span className="hidden sm:inline">Return to my smile</span>
       </button>
 
-      <div className="absolute right-5 top-5 z-20 flex flex-col items-end gap-2">
+      <div className="absolute right-3 top-3 z-20 flex flex-col items-end gap-2 sm:right-5 sm:top-5">
         <button
           type="button"
           onClick={toggleChimes}
           aria-pressed={chimesOn}
-          className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+          aria-label={chimesOn ? 'World sound on' : 'World sound off'}
+          className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
         >
           {chimesOn ? <Volume2 className="size-4" aria-hidden="true" /> : <VolumeX className="size-4" aria-hidden="true" />}
-          World sound: {chimesOn ? 'On' : 'Off'}
+          <span className="hidden sm:inline">World sound: {chimesOn ? 'On' : 'Off'}</span>
         </button>
         {phase === 'world' && activeCapsule && capsuleStatus === 'ready' && (
           <button
             type="button"
             onClick={() => readCapsuleAloud(activeCapsule)}
             disabled={isReading}
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-2 text-xs font-semibold text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/40"
+            aria-label={isReading ? 'The world is speaking' : 'Hear this world'}
+            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
           >
-            <Volume2 className="size-4" aria-hidden="true" />
-            {isReading ? 'The world is speaking…' : 'Hear this world'}
+            <Speech className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">{isReading ? 'The world is speaking…' : 'Hear this world'}</span>
           </button>
         )}
       </div>
 
-      <div className="absolute bottom-5 left-5 z-20 flex max-w-[15rem] items-start gap-3 rounded-2xl border border-white/15 bg-[#160a31]/65 px-4 py-3 backdrop-blur">
+      <div
+        className="absolute bottom-3 left-3 z-20 flex w-[min(11.5rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/75 px-3 py-2 backdrop-blur sm:bottom-5 sm:left-5"
+        role="status"
+        aria-label={
+          smileStatus === 'no-face'
+            ? 'Step into view — this world dims without you'
+            : smileStatus === 'unavailable' || smileStatus === 'idle'
+              ? 'Smile signal resting — tapping works too'
+              : 'Your smile is lighting this world'
+        }
+      >
         <motion.span
           animate={reduceMotion ? undefined : { opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-          className="mt-1 size-2.5 shrink-0 rounded-full bg-amber-200"
+          className="size-2 shrink-0 rounded-full bg-amber-200"
           style={{ boxShadow: `0 0 ${6 + smileScore * 14}px ${2 + smileScore * 5}px rgba(255,227,151,${0.25 + smileScore * 0.5})` }}
           aria-hidden="true"
         />
-        <div className="min-w-0">
-          <p className="text-xs font-semibold leading-snug text-white/85">
-            {smileStatus === 'no-face'
-              ? 'Step into view — this world dims without you'
-              : smileStatus === 'unavailable' || smileStatus === 'idle'
-                ? 'Smile signal resting — tapping works too'
-                : 'Your smile is lighting this world'}
-          </p>
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
-                style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
-              />
-            </div>
-            <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.08em] text-amber-100/90">
-              {Math.round(Math.min(smileScore, 1) * 100)}%
-            </span>
-          </div>
-          <p className="mt-1.5 text-[10px] leading-snug text-white/45">
-            Camera stays in your browser only. Leaving the portal closes it.
-          </p>
+        <span className="shrink-0 text-[10px] font-semibold text-white/85">Your smile</span>
+        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
+            style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
+          />
         </div>
+        <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.06em] text-amber-100/90">
+          {Math.round(Math.min(smileScore, 1) * 100)}%
+        </span>
       </div>
 
       <AnimatePresence>
@@ -1327,8 +1329,8 @@ function SmileStory({
               <p className="mt-1 text-sm text-white/60">{signature.shape} · {signature.momentCode}</p>
               <div className="mt-6 grid w-full gap-3 rounded-2xl border border-white/12 bg-white/5 p-4">
                 <StoryStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
-                <StoryStat label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 2000) * 100} />
-                <StoryStat label="BLOOM" value={signature.riseRate >= 0.35 ? 'quick' : 'gentle'} percent={(signature.riseRate / 0.8) * 100} />
+                <StoryStat label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 4000) * 100} />
+                <StoryStat label="BLOOM" value={bloomLabel(signature.riseRate)} percent={(signature.riseRate / 1) * 100} />
               </div>
               <p className="mt-4 text-xs leading-relaxed text-white/45">
                 This exact smile will never happen again. Its print belongs to this moment alone.

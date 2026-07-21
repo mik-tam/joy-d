@@ -4,8 +4,10 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 const WASM_ROOT =
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm'
 const SMILE_THRESHOLD = 0.45
+const SMILE_RELEASE_THRESHOLD = 0.36
 const REQUIRED_SMILE_MS = 500
 const INFERENCE_INTERVAL_MS = 110
+const MAX_HOLD_MS = 8000
 
 export type SmileDetectionStatus =
   | 'idle'
@@ -25,6 +27,7 @@ type UseSmileDetectionOptions = {
   enabled: boolean
   videoRef: RefObject<HTMLVideoElement | null>
   onSmileDetected: (moment: SmileMoment) => void
+  onSmileMomentChange?: (moment: SmileMoment) => void
 }
 
 type SmileDetection = {
@@ -34,20 +37,43 @@ type SmileDetection = {
   wowScore: number
 }
 
+function buildMoment(
+  now: number,
+  smileStartedAt: number,
+  peakScore: number,
+  startScore: number,
+  peakReachedAt: number,
+): SmileMoment {
+  const heldForMs = Math.min(Math.max(now - smileStartedAt, 0), MAX_HOLD_MS)
+  const riseMs = Math.max(peakReachedAt - smileStartedAt, 80)
+  const riseRate = Math.max(0, (peakScore - startScore) / (riseMs / 1000))
+  return {
+    heldForMs,
+    peakSignal: peakScore,
+    riseRate,
+  }
+}
+
 export function useSmileDetection({
   enabled,
   videoRef,
   onSmileDetected,
+  onSmileMomentChange,
 }: UseSmileDetectionOptions): SmileDetection {
   const [status, setStatus] = useState<SmileDetectionStatus>('idle')
   const [smileScore, setSmileScore] = useState(0)
   const [wowScore, setWowScore] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const onSmileDetectedRef = useRef(onSmileDetected)
+  const onSmileMomentChangeRef = useRef(onSmileMomentChange)
 
   useEffect(() => {
     onSmileDetectedRef.current = onSmileDetected
   }, [onSmileDetected])
+
+  useEffect(() => {
+    onSmileMomentChangeRef.current = onSmileMomentChange
+  }, [onSmileMomentChange])
 
   useEffect(() => {
     if (!enabled) {
@@ -66,8 +92,23 @@ export function useSmileDetection({
     let smoothedScore = 0
     let smoothedWow = 0
     let smileStartedAt: number | null = null
+    let smileStartScore = SMILE_THRESHOLD
     let peakScore = 0
-    let triggered = false
+    let peakReachedAt = 0
+    let unlocked = false
+    // Freeze signature metrics once the unlocking smile ends, so a later
+    // "step through" smile does not rewrite HOLD / BLOOM / BRIGHTNESS.
+    let metricsFrozen = false
+    let lastEmittedHoldBucket = -1
+
+    const emitLiveMoment = (now: number, force = false) => {
+      if (metricsFrozen || smileStartedAt === null) return
+      const moment = buildMoment(now, smileStartedAt, peakScore, smileStartScore, peakReachedAt || smileStartedAt)
+      const holdBucket = Math.round(moment.heldForMs / 100)
+      if (!force && holdBucket === lastEmittedHoldBucket) return
+      lastEmittedHoldBucket = holdBucket
+      onSmileMomentChangeRef.current?.(moment)
+    }
 
     const start = async () => {
       setStatus('loading')
@@ -110,8 +151,14 @@ export function useSmileDetection({
             const categories = result.faceBlendshapes[0]?.categories
 
             if (!categories) {
+              if (unlocked && smileStartedAt !== null && !metricsFrozen) {
+                emitLiveMoment(now, true)
+                metricsFrozen = true
+              }
               smileStartedAt = null
+              smileStartScore = SMILE_THRESHOLD
               peakScore = 0
+              peakReachedAt = 0
               smoothedScore = 0
               smoothedWow = 0
               setSmileScore(0)
@@ -140,23 +187,42 @@ export function useSmileDetection({
               smoothedWow = smoothedWow * 0.6 + rawWow * 0.4
               setWowScore(smoothedWow)
 
-              if (smoothedScore >= SMILE_THRESHOLD) {
-                smileStartedAt ??= now
-                peakScore = Math.max(peakScore, smoothedScore)
+              const holding =
+                smoothedScore >= (unlocked ? SMILE_RELEASE_THRESHOLD : SMILE_THRESHOLD)
+
+              if (holding) {
+                if (smileStartedAt === null) {
+                  smileStartedAt = now
+                  smileStartScore = smoothedScore
+                  peakScore = smoothedScore
+                  peakReachedAt = now
+                  lastEmittedHoldBucket = -1
+                }
+
+                if (smoothedScore > peakScore) {
+                  peakScore = smoothedScore
+                  peakReachedAt = now
+                }
+
                 setStatus('smiling')
 
-                if (!triggered && now - smileStartedAt >= REQUIRED_SMILE_MS) {
-                  triggered = true
-                  const heldForMs = now - smileStartedAt
-                  onSmileDetectedRef.current({
-                    heldForMs,
-                    peakSignal: peakScore,
-                    riseRate: (peakScore - SMILE_THRESHOLD) / (heldForMs / 1000),
-                  })
+                if (!unlocked && now - smileStartedAt >= REQUIRED_SMILE_MS) {
+                  unlocked = true
+                  const moment = buildMoment(now, smileStartedAt, peakScore, smileStartScore, peakReachedAt)
+                  onSmileDetectedRef.current(moment)
+                  lastEmittedHoldBucket = Math.round(moment.heldForMs / 100)
+                } else if (unlocked && !metricsFrozen) {
+                  emitLiveMoment(now)
                 }
               } else {
+                if (unlocked && smileStartedAt !== null && !metricsFrozen) {
+                  emitLiveMoment(now, true)
+                  metricsFrozen = true
+                }
                 smileStartedAt = null
+                smileStartScore = SMILE_THRESHOLD
                 peakScore = 0
+                peakReachedAt = 0
                 setStatus('ready')
               }
             }
