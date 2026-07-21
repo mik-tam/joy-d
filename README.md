@@ -46,6 +46,12 @@ A few decisions I made with Codex along the way:
 - Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
 - A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
 
+## The hardest problem
+
+Free-model calls can be slow, and they'll occasionally hand back JSON wrapped in a Markdown fence instead of the clean schema I asked for. The generation flow had to survive both, plus React's development-mode duplicate requests, without ever losing a Joy Capsule that already succeeded because a later call failed.
+
+The harder problem showed up once the AI started painting its own worlds. A model casting elements at will has no sense of where things already are: a colossal moon and a tiny door would land on the exact same spot as often as not. I built a small physics-style solver with Codex that spreads every cast element apart just enough for depth without letting anything swallow anything else, then clamps everything back inside the frame. It runs on every single capsule, silently, before a user ever sees the scene.
+
 ## Privacy by design
 
 JOY:D is a creative experience. Not an emotion-analysis product. Not biometric identification.
@@ -139,68 +145,11 @@ Hosts normally provide `PORT`; `npm start` binds to the host's network interface
 
 The matching finale is local and anonymous. Its first result may be a clearly disclosed seeded demo traveler; a later local session can match a short-lived anonymous live traveler.
 
-## Demo video script (about two minutes forty)
-
-**0:00-0:12, hook.** On screen: the landing page, boat sailing past, click into the camera.
-> "Most apps ask you to tap a button to start. JOY:D asks you to smile. I built it with Codex, using GPT-5.6, for OpenAI Build Week."
-
-**0:12-0:36, the ritual.** On screen: camera opens, smile meter fills, first unlock, the Joy Signature Print and its stats appear.
-> "The camera never leaves my browser. That boundary, what stays local and what's allowed to leave, is something I built together with Codex. Face landmarks get read locally, turned into a Smile Signature nobody else will ever have, and that's the only thing that goes anywhere. No frames. No face data. Just a shape, a color trail, a name."
-
-**0:36-1:05, the first world.** On screen: enter the portal, the wormhole transition, the story typing itself out (speed this up or cut it in the edit), the painted world fading in.
-> "Smile again, and you fall through. GPT-5.6 writes the story, then casts its own scene: a backdrop, a handful of elements, each with its own vivid description. A second call paints every one of those into real watercolor art. Same palette, same world, every single time it's different. Watch the wormhole. That's not a video file. That's just motion, spinning."
-
-**1:05-1:35, the interaction.** On screen: hold a smile to charge the next door, then a big WOW face triggering a hidden wonder to transform.
-> "Hold a smile, and it charges the next door open, right there on screen. Make a big WOW face, mouth wide open, and a hidden wonder in the scene turns into something the AI just painted for that exact secret. Every Smile Signature shape unlocks a little differently. Bright Spark wants a fast, high smile. Slow Sunrise wants a long, gentle one."
-
-**1:35-1:55, escalation.** On screen: quick cuts across all three doors, showing the worlds getting stranger.
-> "Three doors. Each one stranger than the last. By the third, scale just stops making sense: giant things where they shouldn't be, tiny things holding enormous weight. That's on purpose. And the world is still painting itself while you're reading, so the wait becomes part of the story."
-
-**1:55-2:25, the finale.** On screen: the cosmic Joy Story recap, the spinning Joy Print, a held smile triggering the search, two prints meeting.
-> "At the end, JOY:D wraps the whole run into one journey: every world you found, the smile signature that made all of it. Then one held smile reaches out. Somewhere out there, another traveler's smile made a shape close to yours. Two prints meet. That's the whole point. Not detecting a smile. Making one more reason for one."
-
-**2:25-2:40, close.** On screen: back to the landing page, the tagline.
-> "JOY:D. Built with Codex, using GPT-5.6, for OpenAI Build Week 2026. Every smile opens a new world. Go find yours."
-
-### Recording it without a production budget
-
-The real risk here isn't the camera. It's that AI generation takes a few seconds and free models occasionally stumble, and one bad take shouldn't force a full re-record.
-
-1. Record the browser, not the IDE, at the deployed URL so it's obviously live. QuickTime Player's **File → New Screen Recording** is free and already on your Mac.
-2. Record one short clip per beat above, not one long take. If a generation call is slow or a smile doesn't register, just redo that clip.
-3. Record the voiceover separately once the clips are locked, using Voice Memos or QuickTime's **New Audio Recording**, in a quiet room, close to the mic. Read the script above.
-4. Assemble in iMovie (free, built in): drop the clips on the timeline in order, trim the dead air, nudge any slow loading moment to 1.1-1.25x speed, lay the voiceover underneath, export.
-5. Upload as **public** on YouTube, not unlisted. Paste that link into the Devpost form.
-
 ## Codex feedback session ID
 
 OpenAI Build Week asks for the `/feedback` Codex Session ID associated with the majority of the project's core functionality. Before submitting, run `/feedback` in that Codex session and paste the resulting ID into the Devpost form. Do not invent or commit a session ID to this repository.
 
-## Devpost description starter
-
-### Inspiration
-
-A smile is just a muscle movement to most software. We wanted it to be a key.
-
-Instead of building another app that measures how someone feels, JOY:D turns a real moment of joy into a digital act of discovery. Smile once, and a tiny impossible world opens.
-
-### What it does
-
-JOY:D detects a smile locally, turns it into a creative Smile Signature, and uses AI to generate a one-of-one Joy Capsule: a whimsical world, a micro-story, a quote, a sound mood, a visual direction, a hidden surprise. Travel three layers deep. Get a shareable Joy Story. Finish with an anonymous resonance match: "Your smile found another smile."
-
-### How we built it
-
-Built with Codex using GPT-5.6, JOY:D is a React and TypeScript web app. MediaPipe Face Landmarker runs entirely in the browser for the real-time smile signal (the same jaw-open and mouth-funnel blendshapes double as a "WOW" detector for the hidden wonders). An API layer sends a deliberately minimal creative signature to an OpenAI-compatible model through OpenRouter or OpenAI, which writes back both the story and a scene it casts for itself: a backdrop and a handful of visual elements, each with its own vivid description. A second call paints those descriptions into real transparent watercolor sprites and a backdrop image, style-locked to the story's own palette. Framer Motion carries the wormhole transitions and the portal ring. The matching engine runs a small weighted comparison across only the playful signature fields, with temporary in-memory travelers for the hackathon demo.
-
-Codex was the build partner end to end: product architecture, UI iteration, the local privacy boundaries, API resilience, the AI scene-casting pipeline, all of it. GPT-5.6 helped make the key tradeoffs explicit. A first experience that feels genuinely magical. No misleading emotion claims, ever. An anonymous matching finale that's real within the local demo, not overpromised.
-
-### Challenges we ran into
-
-Free-model calls can be slow, and they'll occasionally hand back JSON wrapped in a Markdown fence instead of the clean schema we asked for. The generation flow had to survive both, plus React's development-mode duplicate requests, without ever losing a Joy Capsule that already succeeded because a later call failed.
-
-The harder problem showed up once the AI started painting its own worlds. A model casting elements at will has no sense of where things already are: a colossal moon and a tiny door would land on the exact same spot as often as not. We built a small physics-style solver that spreads every cast element apart just enough for depth without letting anything swallow anything else, then clamps everything back inside the frame. It runs on every single capsule, silently, before a user ever sees the scene.
-
-### What's next
+## What's next
 
 Future JOY:D could grow into a global Joyventure universe: opt-in persistent journeys, friend quests, a real-time joy constellation, AR worlds nobody's smiled into yet. Privacy stays non-negotiable. A smile is never identity. It is never a scientific measurement of how you feel. It is just the key.
 
