@@ -586,13 +586,13 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         {phase === 'world' && activeCapsule && capsuleStatus === 'ready' && (
           <button
             type="button"
-            onClick={() => readCapsuleAloud(activeCapsule)}
-            disabled={isReading}
-            aria-label={isReading ? 'The world is speaking' : 'Hear this world'}
-            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
+            onClick={() => (isReading ? stopReading() : readCapsuleAloud(activeCapsule))}
+            aria-label={isReading ? 'Stop the reading' : 'Hear this world'}
+            aria-pressed={isReading}
+            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
           >
             <Speech className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{isReading ? 'The world is speaking…' : 'Hear this world'}</span>
+            <span className="hidden sm:inline">{isReading ? 'Stop reading' : 'Hear this world'}</span>
           </button>
         )}
       </div>
@@ -1131,7 +1131,7 @@ function TravelerFlipCard({
         className="relative h-full w-full [transform-style:preserve-3d]"
       >
         {/* Signature composition side (shown first). */}
-        <div className="absolute inset-0 flex flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
+        <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
             <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
@@ -1152,9 +1152,9 @@ function TravelerFlipCard({
         </div>
 
         {/* Worlds side. */}
-        <div className="absolute inset-0 flex rotate-y-180 flex-col rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <div className="absolute inset-0 flex rotate-y-180 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label} · 3 WORLDS</p>
-          <ol className="mt-2 grid flex-1 gap-2">
+          <ol className="mt-2 grid min-h-0 flex-1 gap-2 overflow-y-auto">
             {worlds.slice(0, 3).map((world, index) => {
               const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
               const mark = spriteMarks[world.sprite ?? ''] ?? '✦'

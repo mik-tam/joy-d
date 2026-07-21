@@ -85,21 +85,19 @@ function pickSoftVoice(): SpeechSynthesisVoice | null {
 }
 
 function softScript(worldName: string, story: string, quote: string) {
-  // Short breaths between sections (and sentences on mobile) keep the reading
-  // from sounding like one unbroken machine dump.
+  // One sentence per utterance, on every device: a long single utterance
+  // reads flat and mechanical, but short breaths between sentences (with a
+  // pause between them, see speakNext) give the reading a storyteller's
+  // cadence instead of one unbroken machine dump.
   const title = worldName.trim().replace(/[.!?]+$/, '')
   const quoteText = quote.trim().replace(/^["“]|["”]$/g, '')
   const storyText = story.trim()
   const chunks = [title]
 
-  if (isAppleTouchDevice() || isAndroidDevice()) {
-    const sentences = storyText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [storyText]
-    for (const sentence of sentences) {
-      const trimmed = sentence.trim()
-      if (trimmed) chunks.push(trimmed)
-    }
-  } else if (storyText) {
-    chunks.push(storyText)
+  const sentences = storyText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [storyText]
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim()
+    if (trimmed) chunks.push(trimmed)
   }
 
   if (quoteText) chunks.push(quoteText)
@@ -129,6 +127,7 @@ export function speakJoyWorld(
     onDone?.()
     return
   }
+  const hasQuote = Boolean(capsule.quote.trim().replace(/^["“]|["”]$/g, ''))
 
   let index = 0
   let cancelled = false
@@ -147,11 +146,14 @@ export function speakJoyWorld(
       return
     }
 
+    const chunkIndex = index
+    const isTitle = chunkIndex === 0
     // Re-pick on every chunk — iOS often finishes loading Enhanced voices
     // mid-reading after the user gesture that started playback.
     const voice = pickSoftVoice()
-    const utterance = new SpeechSynthesisUtterance(chunks[index])
+    const utterance = new SpeechSynthesisUtterance(chunks[chunkIndex])
     index += 1
+    const nextIsQuote = hasQuote && index === chunks.length - 1
     if (voice) {
       utterance.voice = voice
       utterance.lang = voice.lang
@@ -159,12 +161,24 @@ export function speakJoyWorld(
       utterance.lang = mobile ? 'en-GB' : 'en-US'
     }
     // Slower, warmer storytelling cadence — slightly softer still on phones.
-    utterance.rate = mobile ? 0.78 : 0.82
-    utterance.pitch = mobile ? 1.06 : 1.02
+    // A small per-sentence jitter keeps a multi-sentence story from sounding
+    // like a metronome; a real storyteller never hits the exact same beat
+    // twice in a row.
+    const jitter = (Math.random() - 0.5) * 0.05
+    utterance.rate = (mobile ? 0.78 : 0.82) + jitter
+    utterance.pitch = (mobile ? 1.06 : 1.02) + jitter * 0.6
     utterance.volume = 1
     utterance.onend = () => {
       if (cancelled) return
-      window.setTimeout(speakNext, index >= chunks.length ? 0 : mobile ? 420 : 320)
+      const pause =
+        index >= chunks.length
+          ? 0
+          : isTitle
+            ? (mobile ? 520 : 420) // a breath before the story begins
+            : nextIsQuote
+              ? (mobile ? 560 : 460) // a small dramatic beat before the closing quote
+              : (mobile ? 420 : 320)
+      window.setTimeout(speakNext, pause)
     }
     utterance.onerror = finishError
     synth.speak(utterance)
