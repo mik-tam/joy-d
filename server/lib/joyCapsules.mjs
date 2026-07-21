@@ -443,40 +443,67 @@ export async function handleJoyCapsuleRequest(requestBody) {
       }
     }
 
-    const requestCompletion = (modelOverride) => {
-      if (!useOpenRouter) return requestViaOpenAI(STANDARD_TIMEOUT_MS)
-      const model = modelOverride || activeOpenRouterModel
-      const timeoutMs = model === openRouterFreeModel ? FREE_TIER_TIMEOUT_MS : STANDARD_TIMEOUT_MS
-      return requestViaOpenRouter(model, timeoutMs)
+    const requestOpenAIWithRetry = async () => {
+      try {
+        return await requestViaOpenAI(STANDARD_TIMEOUT_MS)
+      } catch (error) {
+        const status = typeof error?.status === 'number' ? error.status : undefined
+        const retryable = error?.name === 'AbortError' || status === undefined || status >= 500 || status === 429
+        if (!retryable) throw error
+        return await requestViaOpenAI(STANDARD_TIMEOUT_MS)
+      }
     }
 
-    // One quiet retry for congested models; ToS/404 on OpenRouter tries the
-    // next model; a slow free-tier response hands off to direct OpenAI
-    // (if configured) instead of waiting out the full timeout on retry.
+    // Walk the OpenRouter model chain (free tier first, then paid
+    // fallbacks): a ToS/404 block moves to the next model, a slow free-tier
+    // response gives up on OpenRouter immediately (paid fallbacks are
+    // account-blocked too when the account itself is blocked, so cycling
+    // through them just burns time), and any other transient error gets one
+    // quiet retry of that same model before moving on. If every OpenRouter
+    // attempt fails, direct OpenAI is the backup whenever it's configured —
+    // not only for a slow free tier — since a ToS-blocked account can also
+    // block every paid fallback outright.
     let completion
-    try {
-      completion = await requestCompletion()
-    } catch (error) {
-      const status = typeof error?.status === 'number' ? error.status : undefined
-      const message = error instanceof Error ? error.message : ''
-      const providerBlocked = status === 403 && /terms of service|prohibited/i.test(message)
-      const retryable = error?.name === 'AbortError' || status === undefined || status >= 500 || status === 429
-      if (useOpenRouter && error?.name === 'AbortError' && activeOpenRouterModel === openRouterFreeModel && hasOpenAI) {
-        console.warn('JOY:D OpenRouter free tier timed out; falling back to direct OpenAI for this request.')
-        servedByOpenAIFallback = true
-        completion = await requestViaOpenAI(STANDARD_TIMEOUT_MS)
-      } else if (useOpenRouter && (providerBlocked || status === 404)) {
-        const nextModel = openRouterModels.find((model) => model !== activeOpenRouterModel)
-        if (nextModel) {
-          console.warn(`JOY:D OpenRouter model "${activeOpenRouterModel}" failed (${status}); trying ${nextModel}`)
-          completion = await requestCompletion(nextModel)
-        } else {
-          throw error
+    if (!useOpenRouter) {
+      completion = await requestOpenAIWithRetry()
+    } else {
+      let lastError
+      for (const model of openRouterModels) {
+        const timeoutMs = model === openRouterFreeModel ? FREE_TIER_TIMEOUT_MS : STANDARD_TIMEOUT_MS
+        try {
+          completion = await requestViaOpenRouter(model, timeoutMs)
+          lastError = undefined
+          break
+        } catch (error) {
+          lastError = error
+          const status = typeof error?.status === 'number' ? error.status : undefined
+          const message = error instanceof Error ? error.message : ''
+          const providerBlocked = status === 403 && /terms of service|prohibited/i.test(message)
+          if (error?.name === 'AbortError' && model === openRouterFreeModel) {
+            console.warn('JOY:D OpenRouter free tier timed out.')
+            break
+          }
+          if (providerBlocked || status === 404) {
+            console.warn(`JOY:D OpenRouter model "${model}" failed (${status}); trying next fallback if any.`)
+            continue
+          }
+          const retryable = error?.name === 'AbortError' || status === undefined || status >= 500 || status === 429
+          if (!retryable) break
+          try {
+            completion = await requestViaOpenRouter(model, timeoutMs)
+            lastError = undefined
+            break
+          } catch (retryError) {
+            lastError = retryError
+            break
+          }
         }
-      } else if (!retryable) {
-        throw error
-      } else {
-        completion = await requestCompletion()
+      }
+      if (!completion) {
+        if (!hasOpenAI) throw lastError
+        console.warn('JOY:D all OpenRouter chat attempts failed; falling back to direct OpenAI for this request.')
+        servedByOpenAIFallback = true
+        completion = await requestOpenAIWithRetry()
       }
     }
 
