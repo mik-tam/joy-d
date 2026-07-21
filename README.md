@@ -31,7 +31,7 @@ Key decisions accelerated with Codex and GPT-5.6:
 1. Open the camera and smile.
 2. JOY:D detects the smile locally in the browser and creates a playful, non-scientific Smile Signature.
 3. A portal opens into a darkened star-void where the world's story writes itself out typewriter-style — the reading time doubles as painting time, and the finished world then fades in as layered generated art with its name and quote floating over it.
-4. Inside the portal the smile stays the key: the live smile lights each world, and holding a smile charges the next door open (tapping always works too). Each Smile Signature shape unlocks a little differently.
+4. Inside the portal the face stays the key: the live smile lights each world, holding a smile charges the next door open, and a held "WOW" face (an open, O-shaped mouth — detected locally from the same face signal) transforms the hidden wonder into an AI-painted element of the scene. Tapping always works too. Each Smile Signature shape unlocks a little differently.
 5. Follow the glimmer through up to three distinct discoveries.
 6. Create and share a Joy Story.
 7. Let the signature find another anonymous JOY:D traveler.

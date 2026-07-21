@@ -2,7 +2,9 @@ import type { SmileMoment } from './useSmileDetection'
 
 export type JoySignature = {
   colorTrail: [string, string, string]
+  heldForMs: number
   momentCode: string
+  riseRate: number
   shape: 'Gentle Bloom' | 'Bright Spark' | 'Slow Sunrise'
   signalPercent: number
   wonderTitle: string
@@ -48,7 +50,9 @@ export function createJoySignature(moment: SmileMoment): JoySignature {
 
   return {
     colorTrail: colorTrails[hash % colorTrails.length],
+    heldForMs: Math.round(moment.heldForMs),
     momentCode: `JOY-${hash.toString(36).slice(-5).toUpperCase()}`,
+    riseRate: Math.round(moment.riseRate * 100) / 100,
     shape,
     signalPercent,
     wonderTitle: wonderTitles[(hash >>> 3) % wonderTitles.length],

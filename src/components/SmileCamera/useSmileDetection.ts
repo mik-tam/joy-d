@@ -31,6 +31,7 @@ type SmileDetection = {
   error: string | null
   smileScore: number
   status: SmileDetectionStatus
+  wowScore: number
 }
 
 export function useSmileDetection({
@@ -40,6 +41,7 @@ export function useSmileDetection({
 }: UseSmileDetectionOptions): SmileDetection {
   const [status, setStatus] = useState<SmileDetectionStatus>('idle')
   const [smileScore, setSmileScore] = useState(0)
+  const [wowScore, setWowScore] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const onSmileDetectedRef = useRef(onSmileDetected)
 
@@ -51,6 +53,7 @@ export function useSmileDetection({
     if (!enabled) {
       setStatus('idle')
       setSmileScore(0)
+      setWowScore(0)
       setError(null)
       return
     }
@@ -61,6 +64,7 @@ export function useSmileDetection({
     let lastInferenceAt = 0
     let lastVideoTime = -1
     let smoothedScore = 0
+    let smoothedWow = 0
     let smileStartedAt: number | null = null
     let peakScore = 0
     let triggered = false
@@ -109,7 +113,9 @@ export function useSmileDetection({
               smileStartedAt = null
               peakScore = 0
               smoothedScore = 0
+              smoothedWow = 0
               setSmileScore(0)
+              setWowScore(0)
               setStatus('no-face')
             } else {
               const left = categories.find(
@@ -121,6 +127,18 @@ export function useSmileDetection({
               const rawScore = (left + right) / 2
               smoothedScore = smoothedScore * 0.65 + rawScore * 0.35
               setSmileScore(smoothedScore)
+
+              // A "WOW" is an open, O-shaped mouth: jaw dropped with lips
+              // funneled. Used to reveal hidden wonders inside the worlds.
+              const jawOpen = categories.find(
+                (category) => category.categoryName === 'jawOpen',
+              )?.score ?? 0
+              const funnel = categories.find(
+                (category) => category.categoryName === 'mouthFunnel',
+              )?.score ?? 0
+              const rawWow = jawOpen * 0.65 + funnel * 0.35
+              smoothedWow = smoothedWow * 0.6 + rawWow * 0.4
+              setWowScore(smoothedWow)
 
               if (smoothedScore >= SMILE_THRESHOLD) {
                 smileStartedAt ??= now
@@ -168,5 +186,5 @@ export function useSmileDetection({
     }
   }, [enabled, videoRef])
 
-  return { error, smileScore, status }
+  return { error, smileScore, status, wowScore }
 }

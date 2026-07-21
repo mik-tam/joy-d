@@ -1,89 +1,62 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { ArrowUpRight, Sparkles, WandSparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { SmileCamera } from '../components/SmileCamera/SmileCamera'
-import { DoorMark } from '../components/DoorMark'
-import { readVoyages } from '../data/joyJournal'
 
 export function Home() {
   const [screen, setScreen] = useState<'welcome' | 'camera'>('welcome')
-  const [voyageCount, setVoyageCount] = useState(0)
   const reduceMotion = useReducedMotion()
-
-  useEffect(() => {
-    if (screen === 'welcome') setVoyageCount(readVoyages().length)
-  }, [screen])
 
   if (screen === 'camera') {
     return <SmileCamera onBack={() => setScreen('welcome')} />
   }
 
   return (
-    <main className="joy-landing relative isolate flex min-h-screen items-center justify-center overflow-hidden bg-[#281941] px-6 py-12">
+    <main className="joy-landing relative isolate flex h-svh items-center justify-center overflow-hidden bg-[#281941] px-6 py-12">
       <LayeredLanding />
       <VoyagingBoat />
 
-      <section className="w-full max-w-5xl text-center sm:text-left">
-        <motion.p
-          initial={reduceMotion ? false : { opacity: 0, y: -12 }}
+      <motion.p
+        initial={reduceMotion ? false : { opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="absolute top-9 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap text-center text-[0.68rem] font-bold tracking-[0.25em] text-amber-100/90 sm:top-11 sm:text-xs sm:tracking-[0.32em] [@media(max-height:560px)]:hidden"
+      >
+        JOY:D — A TINY PORTAL TO DELIGHT
+      </motion.p>
+
+      <section className="relative z-10 flex w-full flex-col items-center text-center">
+        <motion.h1
+          initial={reduceMotion ? false : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-7 flex items-center justify-center gap-2 text-xs font-bold tracking-[0.32em] text-amber-100/90 sm:justify-start"
+          transition={{ duration: 0.9, delay: 1.6, ease: 'easeOut' }}
+          className="relative z-10 font-serif text-[clamp(1.4rem,min(6vw,8vh),4rem)] font-black leading-[1.08] tracking-[0.02em] text-[#fff3cf] drop-shadow-[0_4px_18px_rgba(22,8,42,0.85)]"
         >
-          <Sparkles className="size-4" aria-hidden="true" />
-          A TINY PORTAL TO DELIGHT
-        </motion.p>
+          <span className="block">EVERY SMILE</span>
+          <span className="block">OPENS A NEW WORLD</span>
+        </motion.h1>
 
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.92, y: 18 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.1, ease: 'easeOut' }}
-          className="joy-paper-card max-w-2xl rounded-[2.5rem] border border-[#ffe7a3]/40 bg-[#2c1b50]/68 p-8 shadow-[0_24px_80px_rgba(20,8,42,0.38)] backdrop-blur-xl sm:p-14"
+          initial={reduceMotion ? false : { y: '105vh', rotate: -2 }}
+          animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['105vh', '0vh', '-1vh'], rotate: [-2, 0, 1] }}
+          transition={{ duration: 10, ease: 'easeOut', delay: 1 }}
+          className="relative mt-2 w-[clamp(min(34rem,105vh),min(96vw,98vh),60rem)] max-w-none -translate-x-[16.7%] translate-y-[clamp(0px,calc((640px_-_100vw)*0.2),6vh)] sm:mt-4"
         >
-          <DoorMark className="mx-auto mb-8 size-24 drop-shadow-[0_12px_28px_rgba(22,8,42,0.36)] sm:mx-0" />
-          <p className="mb-3 font-serif text-lg italic tracking-wide text-amber-100/90">A small voyage for the feeling that just arrived.</p>
-          <h1 className="font-serif text-6xl font-black tracking-[-0.06em] text-white sm:text-8xl">
-            JOY
-            <motion.span
-              animate={reduceMotion ? undefined : { scaleY: [1, 1, 0.12, 1] }}
-              transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 5.5, times: [0, 0.3, 0.6, 1] }}
-              className="inline-block text-amber-200"
-            >
-              :
-            </motion.span>
-            D
-          </h1>
-          <p className="mx-auto mt-7 max-w-md text-2xl font-medium leading-snug text-white/95 sm:mx-0 sm:text-3xl">
-            Every smile opens a new world.
-          </p>
-          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-white/80 sm:mx-0">
-            Somewhere beyond the tide, a lantern boat is waiting to carry one bright little moment into an impossible place.
-          </p>
-
+          <img
+            src="/art/portal-garden.png"
+            alt=""
+            className="w-full drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
+          />
+          {/* Clickable entry: the glowing space inside the open doorway. */}
           <button
             type="button"
             onClick={() => setScreen('camera')}
-            className="group mt-10 inline-flex items-center gap-3 rounded-full border border-white/50 bg-[#ffe8a8] px-6 py-3.5 font-bold text-purple-950 shadow-[0_10px_0_#b56a7a,0_17px_30px_rgba(20,8,42,0.38)] transition hover:-translate-y-1 hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/40"
+            className="group absolute left-[60%] top-[25.5%] flex h-[50%] w-[13.5%] items-center justify-center rounded-t-full px-[1%] transition duration-300 hover:bg-amber-100/25 hover:shadow-[0_0_60px_rgba(255,222,140,0.55)] focus:outline-none focus-visible:ring-4 focus-visible:ring-amber-100/80"
           >
-            <WandSparkles className="size-5" aria-hidden="true" />
-            Open the little door
-            <ArrowUpRight className="size-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
+            <span className="font-serif text-[clamp(1.1rem,3vw,1.8rem)] font-black leading-tight text-[#6b3a10] drop-shadow-[0_1px_0_rgba(255,247,214,0.8)] transition group-hover:scale-110">
+              Enter
+            </span>
           </button>
         </motion.div>
-
-        <motion.p
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.75 }}
-          className="mt-7 max-w-md text-sm leading-relaxed text-white/70 sm:mx-0"
-        >
-          Your smile is the key. Camera and face signals stay in your browser; only a playful, non-scientific creative signature begins the story.
-          {voyageCount > 0 && (
-            <span className="mt-2 block text-amber-100/70">
-              ✦ This device remembers {voyageCount === 1 ? 'one voyage' : `${voyageCount} voyages`} — each began with a smile.
-            </span>
-          )}
-        </motion.p>
       </section>
     </main>
   )
@@ -106,30 +79,6 @@ function LayeredLanding() {
         className="absolute top-[4%] right-[9%] z-10 h-[30%] w-[30%] max-w-[25rem] object-contain object-top drop-shadow-[0_0_38px_rgba(255,225,148,0.38)]"
       />
       <DriftingClouds />
-      <motion.img
-        src="/art/portal-garden.png"
-        alt=""
-        initial={reduceMotion ? false : { y: '105vh', rotate: -2 }}
-        animate={reduceMotion ? { y: 0, rotate: 0 } : { y: ['105vh', '0vh', '-1vh'], rotate: [-2, 0, 1] }}
-        transition={{ duration: 10, ease: 'easeOut', delay: 1 }}
-        className="absolute bottom-[17%] right-[-6%] z-10 w-[min(74vw,52rem)] drop-shadow-[0_28px_35px_rgba(12,4,38,0.5)]"
-      />
-      <motion.img
-        src="/art/moonlit-wave-band.png"
-        alt=""
-        initial={reduceMotion ? false : { x: '100vw' }}
-        animate={reduceMotion ? { x: '-9vw' } : { x: ['100vw', '-9vw', '-8vw'], y: [0, -4, 0] }}
-        transition={{ duration: 9, ease: 'easeOut', delay: 0.9 }}
-        className="absolute -bottom-[19%] z-[15] h-auto w-full scale-125 object-contain opacity-55"
-      />
-      <motion.img
-        src="/art/moonlit-wave-band.png"
-        alt=""
-        initial={reduceMotion ? false : { x: '-100vw' }}
-        animate={reduceMotion ? { x: '6vw' } : { x: ['-100vw', '6vw', '5vw'], y: [0, -5, 0] }}
-        transition={{ duration: 6.5, ease: 'easeOut', delay: 0.3 }}
-        className="absolute -bottom-[11%] z-20 h-auto w-full scale-125 object-contain"
-      />
     </div>
   )
 }
@@ -139,6 +88,37 @@ function VoyagingBoat() {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden="true">
+      {/* Wave placement is self-relative: each band is anchored to the screen
+          bottom and pushed down by a percentage of its own artwork height, so
+          the composition scales continuously across every window size. */}
+      <motion.div
+        initial={reduceMotion ? false : { x: '100vw' }}
+        animate={{ x: '-9vw' }}
+        transition={{ duration: 9, ease: 'easeOut', delay: 0.9 }}
+        className="absolute inset-x-0 bottom-0 z-10 opacity-55"
+      >
+        <motion.img
+          src="/art/moonlit-wave-band.png"
+          alt=""
+          animate={reduceMotion ? undefined : { x: [0, '2.5vw', '-2vw', 0], y: [0, -4, -1, 0] }}
+          transition={{ duration: 138, repeat: Infinity, ease: 'easeInOut', delay: 9.9 }}
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[14%] landscape:translate-y-[calc(70%-32vh)]"
+        />
+      </motion.div>
+      <motion.div
+        initial={reduceMotion ? false : { x: '-100vw' }}
+        animate={{ x: '6vw' }}
+        transition={{ duration: 6.5, ease: 'easeOut', delay: 0.3 }}
+        className="absolute inset-x-0 bottom-0 z-20"
+      >
+        <motion.img
+          src="/art/moonlit-wave-band.png"
+          alt=""
+          animate={reduceMotion ? undefined : { x: [0, '-3vw', '2vw', 0], y: [0, -5, -2, 0] }}
+          transition={{ duration: 116, repeat: Infinity, ease: 'easeInOut', delay: 6.8 }}
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[33%] landscape:translate-y-[calc(70%-22vh)]"
+        />
+      </motion.div>
       <motion.img
         src="/art/lantern-boat.png"
         alt=""
@@ -158,18 +138,21 @@ function VoyagingBoat() {
           ease: 'easeInOut',
           times: [0, 0.22, 0.5, 0.66, 1],
         }}
-        className="absolute bottom-[8%] right-[10%] z-30 w-[min(36vw,29rem)] drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)]"
+        className="absolute bottom-[10%] right-[8%] z-40 w-[min(48vw,29rem)] opacity-100 drop-shadow-[0_22px_25px_rgba(12,4,38,0.46)] landscape:bottom-[4%] landscape:right-[10%] landscape:w-[min(36vw,29rem,55vh)]"
       />
+      {/* Front tide rides above the boat so the hull sails in the sea. */}
       <motion.div
         initial={reduceMotion ? false : { x: '-100vw' }}
-        animate={reduceMotion ? { x: '-15vw' } : { x: ['-100vw', '-15vw', '-14vw'], y: [0, -3, 0] }}
+        animate={{ x: '-15vw' }}
         transition={{ duration: 7.5, ease: 'easeOut', delay: 0.7 }}
-        className="absolute inset-x-0 -bottom-[32%] z-[35] opacity-95"
+        className="absolute inset-x-0 bottom-0 z-[45] opacity-95"
       >
-        <img
+        <motion.img
           src="/art/moonlit-wave-band.png"
           alt=""
-          className="h-auto w-full -scale-x-105 scale-y-105 object-contain"
+          animate={reduceMotion ? undefined : { x: [0, '2vw', '-2.5vw', 0], y: [0, -3, -1, 0] }}
+          transition={{ duration: 154, repeat: Infinity, ease: 'easeInOut', delay: 8.2 }}
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -scale-x-100 -translate-x-1/2 translate-y-[54%] landscape:translate-y-[calc(70%-12vh)]"
         />
       </motion.div>
     </div>

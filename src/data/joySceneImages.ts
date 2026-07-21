@@ -47,3 +47,35 @@ export function generateSceneImages(capsule: JoyCapsule): Promise<WorldSceneImag
   imageCache.set(capsule.worldName, request)
   return request
 }
+
+const surpriseCache = new Map<string, Promise<string | null>>()
+
+// The hidden wonder's visual form, painted ahead of time so the reveal is
+// instant when a WOW uncovers it.
+export function generateSurpriseImage(capsule: JoyCapsule): Promise<string | null> {
+  const cached = surpriseCache.get(capsule.worldName)
+  if (cached) return cached
+
+  const request = (async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/joy-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          worldName: `${capsule.worldName.slice(0, 96)} — hidden wonder`,
+          look: capsule.visualDirection,
+          elements: [capsule.surprise.slice(0, 300)],
+        }),
+      })
+      if (!response.ok) return null
+      const result: unknown = await response.json()
+      const elements = (result as { elements?: unknown[] })?.elements
+      return Array.isArray(elements) && typeof elements[0] === 'string' ? elements[0] : null
+    } catch {
+      return null
+    }
+  })()
+
+  surpriseCache.set(capsule.worldName, request)
+  return request
+}

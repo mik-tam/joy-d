@@ -11,15 +11,17 @@ import {
 import { findSmileMatch, SmileMatchError, type SmileMatch } from '../../data/smileMatch'
 import { saveVoyage } from '../../data/joyJournal'
 import { shareJoyStoryCard } from '../../data/joyStoryCard'
-import { generateSceneImages, type WorldSceneImages } from '../../data/joySceneImages'
+import { generateSceneImages, generateSurpriseImage, type WorldSceneImages } from '../../data/joySceneImages'
 import { playConnectionChime, playDiscoveryChime, playHiddenWonderSound, setJoySoundsEnabled, startWorldSoundscape, stopJoySounds, stopWorldSoundscape } from '../../data/joySounds'
 import { WorldSecret, WorldStage } from './WorldStage'
+import { JoyPrint } from '../JoyPrint'
 
 type PortalRevealProps = {
   onClose: () => void
   signature: JoySignature
   smileScore: number
   smileStatus: SmileDetectionStatus
+  wowScore: number
 }
 
 type CapsuleStatus =
@@ -35,7 +37,7 @@ type CapsuleStatus =
 
 type PortalPhase = 'story' | 'world'
 
-export function PortalReveal({ onClose, signature, smileScore, smileStatus }: PortalRevealProps) {
+export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowScore }: PortalRevealProps) {
   const reduceMotion = useReducedMotion()
   const [capsules, setCapsules] = useState<JoyCapsule[]>([])
   const [activeCapsuleIndex, setActiveCapsuleIndex] = useState(0)
@@ -48,6 +50,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
   const [revealedWorlds, setRevealedWorlds] = useState<Set<string>>(() => new Set())
   const [smileCharge, setSmileCharge] = useState(0)
   const [sceneImagesByWorld, setSceneImagesByWorld] = useState<Record<string, WorldSceneImages>>({})
+  const [surpriseImagesByWorld, setSurpriseImagesByWorld] = useState<Record<string, string | null>>({})
   const [imageFailedWorlds, setImageFailedWorlds] = useState<Set<string>>(() => new Set())
   const [visitedWorlds, setVisitedWorlds] = useState<Set<string>>(() => new Set())
   const [phase, setPhase] = useState<PortalPhase>('story')
@@ -55,10 +58,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
   const [skipTyping, setSkipTyping] = useState(false)
   const initialRequestStarted = useRef(false)
   const smileScoreRef = useRef(smileScore)
+  const wowScoreRef = useRef(wowScore)
   const chargeStartRef = useRef<number | null>(null)
+  const wowHoldRef = useRef<number | null>(null)
   const needsReleaseRef = useRef(false)
-  const travel = reduceMotion ? 24 : 1300
-  const duration = reduceMotion ? 0.2 : 0.95
+  const [wowCharge, setWowCharge] = useState(0)
   const activeCapsule = capsules[activeCapsuleIndex] ?? null
   const activeWorldName = activeCapsule?.worldName ?? null
   const discoveryNumber = activeCapsuleIndex + 1
@@ -132,6 +136,52 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
   useEffect(() => {
     smileScoreRef.current = smileScore
   }, [smileScore])
+
+  useEffect(() => {
+    wowScoreRef.current = wowScore
+  }, [wowScore])
+
+  // Paint the hidden wonder's form as soon as its world opens, so the WOW
+  // reveal is instant.
+  useEffect(() => {
+    if (phase !== 'world' || !activeCapsule) return
+    const { worldName } = activeCapsule
+    if (surpriseImagesByWorld[worldName] !== undefined) return
+    let cancelled = false
+    void generateSurpriseImage(activeCapsule).then((url) => {
+      if (cancelled) return
+      setSurpriseImagesByWorld((current) =>
+        current[worldName] !== undefined ? current : { ...current, [worldName]: url },
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [phase, activeCapsule, surpriseImagesByWorld])
+
+  // A held "WOW" — an open O-shaped mouth — uncovers the hidden wonder.
+  useEffect(() => {
+    if (phase !== 'world' || !activeCapsule || storyOpen) return
+    if (revealedWorlds.has(activeCapsule.worldName)) return
+    const tick = setInterval(() => {
+      const wow = wowScoreRef.current
+      if (wow >= 0.42) {
+        wowHoldRef.current ??= performance.now()
+        const progress = Math.min((performance.now() - wowHoldRef.current) / 450, 1)
+        setWowCharge(progress)
+        if (progress >= 1) {
+          wowHoldRef.current = null
+          setWowCharge(0)
+          revealHiddenWonder()
+        }
+      } else if (wowHoldRef.current !== null) {
+        wowHoldRef.current = null
+        setWowCharge(0)
+      }
+    }, 100)
+    return () => clearInterval(tick)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, activeCapsule, storyOpen, revealedWorlds])
 
   // Entering a world for the first time begins in the story void; revisits
   // step straight back into the finished world.
@@ -300,44 +350,13 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
         )}
       </AnimatePresence>
 
-      {[...Array(18)].map((_, index) => (
-        <motion.span
-          key={index}
-          initial={{ opacity: 0, scale: 0.3, x: 0, y: 0 }}
-          animate={
-            reduceMotion
-              ? { opacity: 0 }
-              : {
-                  opacity: [0, 0.9, 0],
-                  scale: [0.3, 1, 0.45],
-                  x: Math.cos((index / 18) * Math.PI * 2) * (90 + (index % 4) * 32),
-                  y: Math.sin((index / 18) * Math.PI * 2) * (90 + (index % 3) * 38),
-                }
-          }
-          transition={reduceMotion ? { duration: 0 } : { delay: 0.35 + (index % 6) * 0.09, duration: 2.3, ease: 'easeOut' }}
-          className="absolute size-2 rounded-full bg-amber-100 shadow-[0_0_18px_5px_rgba(255,227,151,0.42)]"
-          aria-hidden="true"
-        />
-      ))}
-
-      <div className="absolute left-1/2 top-1/2 h-[24rem] w-full max-w-sm -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
-        <motion.div
-          initial={{ x: 0, rotate: 0 }}
-          animate={{ x: -travel, rotate: reduceMotion ? 0 : -8, opacity: 0 }}
-          transition={{ delay: reduceMotion ? 0 : 0.18, duration, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-y-0 left-1/2 w-1/2 origin-left rounded-l-[2.5rem] border border-amber-100/25 bg-[linear-gradient(120deg,rgba(87,48,120,0.98),rgba(42,21,75,0.92))] shadow-[-12px_0_35px_rgba(255,204,130,0.12)]"
-        >
-          <div className="absolute inset-4 rounded-l-[2rem] border border-white/10" />
-        </motion.div>
-        <motion.div
-          initial={{ x: 0, rotate: 0 }}
-          animate={{ x: travel, rotate: reduceMotion ? 0 : 8, opacity: 0 }}
-          transition={{ delay: reduceMotion ? 0 : 0.18, duration, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-y-0 right-1/2 w-1/2 origin-right rounded-r-[2.5rem] border border-amber-100/25 bg-[linear-gradient(240deg,rgba(87,48,120,0.98),rgba(42,21,75,0.92))] shadow-[12px_0_35px_rgba(255,204,130,0.12)]"
-        >
-          <div className="absolute inset-4 rounded-r-[2rem] border border-white/10" />
-        </motion.div>
-      </div>
+      <AnimatePresence>
+        {phase === 'story' && capsuleStatus === 'loading' && !reduceMotion && (
+          <motion.div key="warp" exit={{ opacity: 0, transition: { duration: 0.9 } }}>
+            <WarpField />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {phase === 'story' && (
@@ -510,8 +529,8 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
             </div>
             <p className="text-xs leading-relaxed text-white/45 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]">
               {canGoDeeper
-                ? 'Hold a smile — it charges the next door. Tapping works too.'
-                : 'One long smile gathers your Joy Story. Tapping works too.'}
+                ? 'A held smile charges the next door · a WOW face reveals the hidden wonder. Tapping works too.'
+                : 'One long smile gathers your Joy Story · a WOW face reveals the hidden wonder. Tapping works too.'}
             </p>
           </motion.div>
         </>
@@ -522,6 +541,8 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
           capsule={activeCapsule}
           hiddenRevealed={revealedWorlds.has(activeCapsule.worldName)}
           onRevealHidden={revealHiddenWonder}
+          wowCharge={wowCharge}
+          revealedImage={surpriseImagesByWorld[activeCapsule.worldName]}
         />
       )}
 
@@ -590,6 +611,9 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
           <SmileStory
             signature={signature}
             capsules={capsules}
+            smileScore={smileScore}
+            worldImages={sceneImagesByWorld}
+            wondersRevealed={revealedWorlds}
             onClose={() => setStoryOpen(false)}
             onBeginAgain={onClose}
           />
@@ -599,9 +623,111 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus }: Po
   )
 }
 
-// A slowly turning ring of golden light with a bright shine sweeping around
-// it. The live smile feeds it: the light spill widens, the rim glow deepens,
-// and a second, faster shine spins up as the smile grows.
+const warpStreaks = Array.from({ length: 46 }, (_, index) => ({
+  angle: (index / 46) * 360 + ((index * 37) % 13),
+  delay: (index % 11) * 0.16,
+  duration: 1.05 + (index % 5) * 0.22,
+  length: 5 + ((index * 13) % 9),
+  color: ['#cfd6ff', '#ffe7a3', '#e6b8ff', '#9ee8df', '#ffffff'][index % 5],
+}))
+
+// Streaking starlight rushing past: the wormhole between the doorway and the
+// first world.
+function WarpField() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 90, ease: 'linear', repeat: Infinity }}
+        className="absolute inset-0"
+      >
+        {warpStreaks.map((streak, index) => (
+          <div
+            key={index}
+            className="absolute left-1/2 top-1/2"
+            style={{ transform: `rotate(${streak.angle}deg)` }}
+          >
+            <motion.span
+              initial={{ y: '-4vh', opacity: 0 }}
+              animate={{ y: ['-4vh', '-62vh'], opacity: [0, 0.9, 0] }}
+              transition={{ duration: streak.duration, repeat: Infinity, delay: streak.delay, ease: 'easeIn' }}
+              className="block w-[2.5px] rounded-full"
+              style={{
+                height: `${streak.length}vh`,
+                background: `linear-gradient(to top, transparent, ${streak.color})`,
+                boxShadow: `0 0 8px 1px ${streak.color}55`,
+              }}
+            />
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  )
+}
+
+const emberSparks = Array.from({ length: 24 }, (_, index) => ({
+  angle: (index / 24) * 360 + ((index * 53) % 17),
+  radius: 202 + ((index * 37) % 52),
+  size: 2.5 + (index % 4),
+  delay: (index % 7) * 0.23,
+  duration: 1.4 + (index % 5) * 0.3,
+  color: ['#ffdf8e', '#ffb45e', '#fff3c4', '#ff9a3d'][index % 4],
+}))
+
+const blazeSparks = Array.from({ length: 30 }, (_, index) => ({
+  angle: (index / 30) * 360 + ((index * 71) % 23),
+  radius: 198 + ((index * 43) % 72),
+  size: 3 + (index % 5),
+  delay: (index % 6) * 0.17,
+  duration: 0.9 + (index % 4) * 0.24,
+  color: ['#ffdf8e', '#ffb45e', '#ff9a3d', '#fff3c4', '#ffca6b'][index % 5],
+}))
+
+function SparkOrbit({
+  sparks,
+  spinDuration,
+  reverse,
+  opacity,
+}: {
+  sparks: typeof emberSparks
+  spinDuration: number
+  reverse?: boolean
+  opacity: number
+}) {
+  return (
+    <motion.div
+      animate={{ rotate: reverse ? -360 : 360 }}
+      transition={{ duration: spinDuration, ease: 'linear', repeat: Infinity }}
+      className="relative size-[27rem] transition-opacity duration-300 [grid-area:1/1]"
+      style={{ opacity }}
+    >
+      {sparks.map((spark, index) => (
+        <span
+          key={index}
+          className="absolute left-1/2 top-1/2"
+          style={{ transform: `rotate(${spark.angle}deg) translateY(-${spark.radius}px)` }}
+        >
+          <motion.span
+            animate={{ opacity: [0.1, 1, 0.1], scale: [0.5, 1.25, 0.5] }}
+            transition={{ duration: spark.duration, repeat: Infinity, delay: spark.delay, ease: 'easeInOut' }}
+            className="block rounded-full"
+            style={{
+              width: spark.size,
+              height: spark.size,
+              background: spark.color,
+              boxShadow: `0 0 10px 2px ${spark.color}aa`,
+            }}
+          />
+        </span>
+      ))}
+    </motion.div>
+  )
+}
+
+// A slowly turning ring of golden light spitting sparks, Doctor Strange
+// style in JOY:D's softer palette. The live smile feeds it: the light spill
+// widens, the rim glow deepens, and a faster storm of sparks spins up as the
+// smile grows.
 function PortalRing({ smileScore }: { smileScore: number }) {
   const reduceMotion = useReducedMotion()
   const glow = Math.min(Math.max(smileScore, 0), 1)
@@ -646,6 +772,12 @@ function PortalRing({ smileScore }: { smileScore: number }) {
           boxShadow: `0 0 ${18 + glow * 60}px ${3 + glow * 15}px rgba(255,214,140,${0.12 + glow * 0.42}), inset 0 0 ${10 + glow * 34}px rgba(255,214,140,${0.08 + glow * 0.3})`,
         }}
       />
+      {!reduceMotion && (
+        <>
+          <SparkOrbit sparks={emberSparks} spinDuration={11} opacity={0.55 + glow * 0.45} />
+          <SparkOrbit sparks={blazeSparks} spinDuration={3.6} reverse opacity={glow} />
+        </>
+      )}
     </>
   )
 }
@@ -723,20 +855,140 @@ function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: (
   )
 }
 
+
+// ---------------------------------------------------------------------------
+// The finale: a cosmic, Wrapped-style recap of the whole Joyventure, ending in
+// a smile-triggered meeting with another traveler. Set against the dark
+// universe to mark the departure from the discovered worlds.
+// ---------------------------------------------------------------------------
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const worldFallbackGradients = [
+  'from-[#3b1d63] via-[#5b2f7e] to-[#a066a6]',
+  'from-[#0e4a5f] via-[#116b73] to-[#53b9b7]',
+  'from-[#7a2f56] via-[#c65b62] to-[#f5a24f]',
+]
+
+function CosmicBackdrop({ reduceMotion }: { reduceMotion: boolean }) {
+  return (
+    <>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_38%,#22143f_0%,#130b28_55%,#080414_100%)]" />
+      <div
+        className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_18%_24%,rgba(255,255,255,0.55)_0_1px,transparent_1.6px),radial-gradient(circle_at_63%_57%,rgba(255,255,255,0.32)_0_1px,transparent_1.6px),radial-gradient(circle_at_41%_82%,rgba(255,255,255,0.4)_0_1px,transparent_1.6px),radial-gradient(circle_at_84%_18%,rgba(255,255,255,0.34)_0_1px,transparent_1.6px),radial-gradient(circle_at_9%_66%,rgba(255,255,255,0.3)_0_1px,transparent_1.6px)] [background-size:150px_160px,120px_130px,170px_150px,130px_180px,110px_120px]"
+        aria-hidden="true"
+      />
+      {!reduceMotion && (
+        <motion.div
+          animate={{ opacity: [0.25, 0.5, 0.25] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute left-1/2 top-1/2 size-[40rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(190,140,255,0.16)_0%,transparent_65%)] blur-2xl"
+          aria-hidden="true"
+        />
+      )}
+    </>
+  )
+}
+
+function TrailComet({ colors, className, reverse }: { colors: string[]; className?: string; reverse?: boolean }) {
+  return (
+    <div className={`flex items-center gap-1.5 ${reverse ? 'flex-row-reverse' : ''} ${className ?? ''}`}>
+      {colors.map((color, index) => (
+        <span
+          key={`${color}-${index}`}
+          className="rounded-full"
+          style={{
+            width: 22 - index * 5,
+            height: 22 - index * 5,
+            backgroundColor: color,
+            boxShadow: `0 0 ${18 - index * 4}px ${6 - index}px ${color}bb`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function StoryStat({ label, value, percent }: { label: string; value: string; percent: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-24 shrink-0 text-left text-[11px] font-bold tracking-[0.16em] text-amber-100/70">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(Math.max(percent, 4), 100)}%` }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+          className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
+        />
+      </div>
+      <span className="w-14 shrink-0 text-right text-sm font-semibold text-white/85">{value}</span>
+    </div>
+  )
+}
+
+const meetSparks = Array.from({ length: 30 }, (_, index) => ({
+  angle: (index / 30) * Math.PI * 2 + ((index * 31) % 9) / 9,
+  distance: 90 + ((index * 47) % 170),
+  size: 3 + ((index * 13) % 4),
+  delay: ((index * 7) % 6) * 0.06,
+  color: ['#ffdf8e', '#f5a9c6', '#a9dfff', '#fff3c4', '#c7adff'][index % 5],
+}))
+
+function MeetBurst() {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-1/2 z-10" aria-hidden="true">
+      {meetSparks.map((spark, index) => (
+        <motion.span
+          key={index}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 0.4 }}
+          animate={{
+            x: Math.cos(spark.angle) * spark.distance,
+            y: Math.sin(spark.angle) * spark.distance,
+            opacity: [1, 1, 0],
+            scale: [0.4, 1.2, 0.5],
+          }}
+          transition={{ duration: 1.3, delay: 0.5 + spark.delay, ease: 'easeOut' }}
+          className="absolute rounded-full"
+          style={{
+            width: spark.size,
+            height: spark.size,
+            background: spark.color,
+            boxShadow: `0 0 12px 3px ${spark.color}cc`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 function SmileStory({
   signature,
   capsules,
+  smileScore,
+  worldImages,
+  wondersRevealed,
   onClose,
   onBeginAgain,
 }: {
   signature: JoySignature
   capsules: JoyCapsule[]
+  smileScore: number
+  worldImages: Record<string, WorldSceneImages>
+  wondersRevealed: Set<string>
   onClose: () => void
   onBeginAgain: () => void
 }) {
-  const [shareMessage, setShareMessage] = useState('')
+  const reduceMotion = useReducedMotion()
+  const [chapter, setChapter] = useState(0)
   const [match, setMatch] = useState<SmileMatch | null>(null)
   const [matchStatus, setMatchStatus] = useState<'idle' | 'searching' | 'error'>('idle')
+  const [smileCharge, setSmileCharge] = useState(0)
+  const [shareMessage, setShareMessage] = useState('')
+  const smileScoreRef = useRef(smileScore)
+  const chargeStartRef = useRef<number | null>(null)
+  const searchStartedRef = useRef(false)
+
+  const chapterCount = 4
   const storyText = [
     'MY JOY:D JOURNEY',
     `${signature.wonderTitle} · ${signature.shape} · ${signature.signalPercent}% signal`,
@@ -748,6 +1000,51 @@ function SmileStory({
   useEffect(() => {
     saveVoyage(signature, capsules.map(({ worldName }) => worldName))
   }, [capsules, signature])
+
+  useEffect(() => {
+    smileScoreRef.current = smileScore
+  }, [smileScore])
+
+  const findConnection = useCallback(async () => {
+    if (searchStartedRef.current) return
+    searchStartedRef.current = true
+    setMatchStatus('searching')
+    try {
+      const [result] = await Promise.all([findSmileMatch(signature), delay(reduceMotion ? 300 : 1800)])
+      setMatch(result)
+      playConnectionChime()
+      setMatchStatus('idle')
+    } catch (error) {
+      searchStartedRef.current = false
+      setMatchStatus('error')
+      if (!(error instanceof SmileMatchError)) {
+        setShareMessage('The matching constellation needs another moment.')
+      }
+    }
+  }, [reduceMotion, signature])
+
+  // On the final chapter, a held smile reaches across the dark to find another
+  // traveler. The camera is still watching from inside the portal.
+  useEffect(() => {
+    if (chapter !== 3 || match || matchStatus === 'searching') return
+    const tick = setInterval(() => {
+      const score = smileScoreRef.current
+      if (score >= 0.42) {
+        chargeStartRef.current ??= performance.now()
+        const progress = Math.min((performance.now() - chargeStartRef.current) / 1300, 1)
+        setSmileCharge(progress)
+        if (progress >= 1) {
+          chargeStartRef.current = null
+          setSmileCharge(0)
+          void findConnection()
+        }
+      } else if (chargeStartRef.current !== null) {
+        chargeStartRef.current = null
+        setSmileCharge(0)
+      }
+    }, 100)
+    return () => clearInterval(tick)
+  }, [chapter, match, matchStatus, findConnection])
 
   const shareStory = async () => {
     const outcome = await shareJoyStoryCard(signature, capsules, storyText)
@@ -762,170 +1059,354 @@ function SmileStory({
     )
   }
 
-  const findConnection = async () => {
-    setMatchStatus('searching')
-    try {
-      setMatch(await findSmileMatch(signature))
-      playConnectionChime()
-      setMatchStatus('idle')
-    } catch (error) {
-      setMatchStatus('error')
-      if (!(error instanceof SmileMatchError)) {
-        setShareMessage('The matching constellation needs another moment.')
+  const otherSignature: JoySignature | null = match
+    ? {
+        colorTrail: (match.matchColorTrail.length >= 3
+          ? match.matchColorTrail.slice(0, 3)
+          : ['#f7b7d7', '#a9dfff', '#fff0a8']) as [string, string, string],
+        heldForMs: 700 + match.similarity * 7,
+        momentCode: `JOY-${match.sharedShape.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase()}${match.similarity}`,
+        riseRate: 0.4,
+        shape: match.sharedShape,
+        signalPercent: match.similarity,
+        wonderTitle: 'A fellow traveler',
       }
-    }
-  }
+    : null
+
+  const chapters = ['Journey', 'Worlds', 'Signature', 'Connection']
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-20 flex items-center justify-center bg-[#10051f]/96 px-6 py-8"
+      className="absolute inset-0 z-30 flex flex-col overflow-hidden bg-[#080414]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="joy-story-title"
     >
-      <motion.article
-        initial={{ opacity: 0, y: 22, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 14, scale: 0.98 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="relative max-h-full w-full max-w-md overflow-y-auto rounded-[2rem] border border-amber-100/30 bg-[linear-gradient(145deg,#572a7d,#251244_58%,#182a52)] p-6 text-left shadow-2xl shadow-black/40"
+      <CosmicBackdrop reduceMotion={Boolean(reduceMotion)} />
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 z-30 rounded-full border border-white/15 bg-white/5 p-2 text-white/65 backdrop-blur transition hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
+        aria-label="Close and return to the worlds"
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-2 text-white/65 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-          aria-label="Close Joy Story"
-        >
-          <X className="size-5" aria-hidden="true" />
-        </button>
-        <p className="flex items-center gap-2 text-xs font-bold tracking-[0.2em] text-amber-100/85">
-          <Sparkles className="size-4" aria-hidden="true" />
-          MY JOY:D JOURNEY
-        </p>
-        <h2 id="joy-story-title" className="mt-3 max-w-[16rem] font-serif text-4xl font-black tracking-[-0.05em] text-white">
-          Three impossible places.
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-white/75">
-          Your smile became a {signature.shape.toLowerCase()} and opened a small rabbit hole of joy.
-        </p>
+        <X className="size-5" aria-hidden="true" />
+      </button>
 
-        <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-white/15 bg-[#160a31]/35 p-4">
-          <div>
-            <p className="text-xs font-bold tracking-[0.16em] text-amber-100/75">YOUR SMILE SIGNATURE</p>
-            <p className="mt-1 font-serif text-xl font-bold text-white">{signature.wonderTitle}</p>
-            <p className="text-sm text-white/65">{signature.shape} · {signature.signalPercent}% signal</p>
+      {/* Chapter progress, Wrapped-style. */}
+      <div className="relative z-20 flex items-center justify-center gap-1.5 px-6 pt-5">
+        {chapters.map((name, index) => (
+          <div key={name} className="h-1 flex-1 max-w-[5rem] overflow-hidden rounded-full bg-white/12">
+            <div
+              className="h-full rounded-full bg-amber-100 transition-[width] duration-500"
+              style={{ width: index < chapter ? '100%' : index === chapter ? '100%' : '0%', opacity: index <= chapter ? 1 : 0.3 }}
+            />
           </div>
-          <div className="flex -space-x-2" aria-label="Your color trail">
-            {signature.colorTrail.map((color) => (
-              <span
-                key={color}
-                className="size-8 rounded-full border-2 border-[#291244] shadow-sm"
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-        </div>
+        ))}
+      </div>
 
-        <ol className="mt-6 space-y-3">
-          {capsules.map((capsule, index) => (
-            <li key={capsule.worldName} className="flex gap-3 border-b border-white/10 pb-3 last:border-b-0">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-100/15 text-xs font-bold text-amber-100">{index + 1}</span>
-              <div>
-                <p className="font-serif text-lg font-bold text-white">{capsule.worldName}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-white/60">{capsule.surprise}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        <blockquote className="mt-5 border-l-2 border-amber-100/65 pl-4 text-sm italic leading-relaxed text-amber-50/95">
-          “{capsules.at(-1)?.quote}”
-        </blockquote>
-        <p className="mt-5 text-center font-serif text-lg font-bold text-amber-50">A small smile opened three impossible places.</p>
-
-        <button
-          type="button"
-          onClick={() => void shareStory()}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-amber-100 px-5 py-3 font-bold text-purple-950 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/35"
-        >
-          <Share2 className="size-5" aria-hidden="true" />
-          Share my Joy Story
-        </button>
-        <p className="mt-3 text-center text-xs leading-relaxed text-white/55">
-          {shareMessage || 'Share as text, or save this card as a screenshot.'}
-        </p>
-        <div className="mt-5 border-t border-white/10 pt-5">
-          {match ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="rounded-2xl border border-amber-100/35 bg-amber-100/10 p-4 text-center"
+      <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-6 py-4">
+        <AnimatePresence mode="wait">
+          {/* ---------------------------------------------------------------- */}
+          {chapter === 0 && (
+            <motion.section
+              key="ch-intro"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="flex w-full max-w-md flex-col items-center text-center"
             >
-              <div className="flex items-center justify-center gap-1" aria-hidden="true">
-                <motion.div
-                  initial={{ x: -34, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 1.1, ease: 'easeOut' }}
-                  className="flex items-center gap-1"
-                >
-                  {signature.colorTrail.map((color) => (
-                    <span key={`mine-${color}`} className="size-3.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 10px 3px ${color}88` }} />
-                  ))}
-                </motion.div>
-                <HeartHandshake className="mx-2 size-7 text-amber-100" aria-hidden="true" />
-                <motion.div
-                  initial={{ x: 34, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 1.1, ease: 'easeOut' }}
-                  className="flex items-center gap-1"
-                >
-                  {(match.matchColorTrail.length ? match.matchColorTrail : ['#f7b7d7', '#a9dfff', '#fff0a8']).map((color, index) => (
-                    <span key={`theirs-${color}-${index}`} className="size-3.5 rounded-full" style={{ backgroundColor: color, boxShadow: `0 0 10px 3px ${color}88` }} />
-                  ))}
-                </motion.div>
+              <p className="flex items-center gap-2 text-xs font-bold tracking-[0.3em] text-amber-100/80">
+                <Sparkles className="size-4" aria-hidden="true" />
+                YOUR JOYVENTURE
+              </p>
+              <motion.div
+                initial={reduceMotion ? false : { rotate: -30, opacity: 0, scale: 0.6 }}
+                animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                transition={{ duration: 1, ease: 'easeOut', delay: 0.1 }}
+                className="my-6"
+              >
+                <JoyPrint signature={signature} className="size-32 drop-shadow-[0_0_30px_rgba(255,231,163,0.35)]" />
+              </motion.div>
+              <h2 id="joy-story-title" className="font-serif text-5xl font-black leading-[0.95] tracking-[-0.04em] text-white">
+                Three impossible<br />places.
+              </h2>
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/75">
+                Your smile became a {signature.shape.toLowerCase()} and opened a small rabbit hole of joy.
+              </p>
+              <TrailComet colors={signature.colorTrail} className="mt-6" />
+            </motion.section>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {chapter === 1 && (
+            <motion.section
+              key="ch-worlds"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="flex w-full max-w-3xl flex-col items-center"
+            >
+              <p className="text-xs font-bold tracking-[0.3em] text-amber-100/80">THE PLACES YOUR SMILE OPENED</p>
+              <div className="mt-6 flex w-full snap-x gap-4 overflow-x-auto pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:justify-center">
+                {capsules.map((capsule, index) => {
+                  const images = worldImages[capsule.worldName]
+                  const sprite = images?.elements.find(Boolean) ?? null
+                  const found = wondersRevealed.has(capsule.worldName)
+                  return (
+                    <motion.article
+                      key={capsule.worldName}
+                      initial={reduceMotion ? false : { opacity: 0, y: 20, scale: 0.94 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.15 + index * 0.16, duration: 0.55, ease: 'easeOut' }}
+                      className={`relative flex aspect-[3/4] w-[min(66vw,14rem)] shrink-0 snap-center flex-col justify-end overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br ${worldFallbackGradients[index % 3]} shadow-2xl shadow-black/50`}
+                    >
+                      {images?.backdrop && (
+                        <img src={images.backdrop} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      )}
+                      {sprite && (
+                        <motion.img
+                          src={sprite}
+                          alt=""
+                          animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
+                          transition={{ duration: 5 + index, repeat: Infinity, ease: 'easeInOut' }}
+                          className="absolute left-1/2 top-[14%] w-[46%] -translate-x-1/2 object-contain drop-shadow-[0_10px_20px_rgba(9,4,25,0.5)]"
+                        />
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#080414]/92 via-[#080414]/45 to-transparent" />
+                      <div className="relative p-4">
+                        <p className="text-[10px] font-bold tracking-[0.2em] text-amber-100/80">DOOR {index + 1}</p>
+                        <h3 className="mt-1 font-serif text-lg font-black leading-tight text-white">{capsule.worldName}</h3>
+                        {found ? (
+                          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-amber-100">
+                            <Sparkles className="size-3" aria-hidden="true" /> wonder found
+                          </p>
+                        ) : (
+                          <p className="mt-1.5 text-[11px] text-white/50">a wonder stayed hidden</p>
+                        )}
+                      </div>
+                    </motion.article>
+                  )
+                })}
               </div>
-              <p className="mt-3 font-serif text-2xl font-black text-white">Your smile found another smile.</p>
-              <p className="mt-2 text-sm leading-relaxed text-amber-50/85">Two strangers. One {match.sharedShape.toLowerCase()} frequency.</p>
-              <p className="mt-2 text-xs font-semibold tracking-wide text-amber-100">{match.similarity}% JOY:D resonance</p>
-              <p className="mt-3 text-xs leading-relaxed text-white/50">
-                {match.matchSource === 'live'
-                  ? 'A live anonymous JOY:D traveler is nearby. No profiles or identities are revealed.'
-                  : 'A waiting demo traveler helped awaken this local JOY:D universe.'}
+              <p className="mt-5 text-center text-sm text-white/60">
+                {wondersRevealed.size === capsules.length
+                  ? 'You uncovered every hidden wonder. ✦'
+                  : `${wondersRevealed.size} of ${capsules.length} hidden wonders uncovered.`}
+              </p>
+            </motion.section>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {chapter === 2 && (
+            <motion.section
+              key="ch-signature"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="flex w-full max-w-md flex-col items-center text-center"
+            >
+              <p className="text-xs font-bold tracking-[0.3em] text-amber-100/80">YOUR SMILE SIGNATURE</p>
+              <motion.div
+                animate={reduceMotion ? undefined : { rotate: 360 }}
+                transition={{ duration: 60, ease: 'linear', repeat: Infinity }}
+                className="my-5"
+              >
+                <JoyPrint signature={signature} className="size-28 drop-shadow-[0_0_26px_rgba(255,231,163,0.35)]" />
+              </motion.div>
+              <h2 className="font-serif text-3xl font-black leading-tight tracking-[-0.03em] text-white">{signature.wonderTitle}</h2>
+              <p className="mt-1 text-sm text-white/60">{signature.shape} · {signature.momentCode}</p>
+              <div className="mt-6 grid w-full gap-3 rounded-2xl border border-white/12 bg-white/5 p-4">
+                <StoryStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
+                <StoryStat label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 2000) * 100} />
+                <StoryStat label="BLOOM" value={signature.riseRate >= 0.35 ? 'quick' : 'gentle'} percent={(signature.riseRate / 0.8) * 100} />
+              </div>
+              <p className="mt-4 text-xs leading-relaxed text-white/45">
+                This exact smile will never happen again. Its print belongs to this moment alone.
               </p>
               <button
                 type="button"
-                onClick={onBeginAgain}
-                className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-100/45 bg-white/10 px-5 py-2.5 text-sm font-bold text-amber-50 transition hover:bg-white/20 focus:outline-none focus:ring-4 focus:ring-amber-100/25"
+                onClick={() => void shareStory()}
+                className="mt-5 inline-flex items-center gap-2 rounded-full border border-amber-100/40 bg-amber-100/10 px-5 py-2.5 text-sm font-bold text-amber-50 transition hover:bg-amber-100/20 focus:outline-none focus:ring-4 focus:ring-amber-100/25"
               >
-                <RefreshCw className="size-4" aria-hidden="true" />
-                Begin a new journey
+                <Share2 className="size-4" aria-hidden="true" />
+                Share my Joy Story
               </button>
-              <p className="mt-2 text-xs text-white/45">Every journey starts with a new smile.</p>
-            </motion.div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => void findConnection()}
-                disabled={matchStatus === 'searching'}
-                className="flex w-full items-center justify-center gap-2 rounded-full border border-amber-100/45 bg-white/10 px-5 py-3 font-bold text-amber-50 transition hover:bg-white/20 disabled:cursor-wait disabled:opacity-70 focus:outline-none focus:ring-4 focus:ring-amber-100/25"
-              >
-                <HeartHandshake className="size-5" aria-hidden="true" />
-                {matchStatus === 'searching' ? 'Searching the JOY:D night sky…' : 'Let my smile find another'}
-              </button>
-              <p className="mt-3 text-center text-xs leading-relaxed text-white/50">
-                Only this playful signature is compared. No face, camera frame, name, account, or location is used.
-              </p>
-              {matchStatus === 'error' && (
-                <p className="mt-3 text-center text-xs leading-relaxed text-rose-100/85">The matching constellation needs another moment. Please try again.</p>
+              {shareMessage && <p className="mt-2 text-xs text-white/50">{shareMessage}</p>}
+            </motion.section>
+          )}
+
+          {/* ---------------------------------------------------------------- */}
+          {chapter === 3 && (
+            <motion.section
+              key="ch-connection"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="flex w-full max-w-md flex-col items-center text-center"
+            >
+              {match && otherSignature ? (
+                <div className="relative flex w-full flex-col items-center">
+                  {!reduceMotion && <MeetBurst />}
+                  <div className="relative z-20 flex items-center justify-center gap-4">
+                    <motion.div
+                      initial={reduceMotion ? false : { x: -70, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ duration: 1.1, ease: 'easeOut' }}
+                    >
+                      <JoyPrint signature={signature} className="size-24 drop-shadow-[0_0_22px_rgba(255,231,163,0.4)]" />
+                    </motion.div>
+                    <motion.div
+                      initial={reduceMotion ? false : { scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.7, duration: 0.5, ease: 'backOut' }}
+                    >
+                      <HeartHandshake className="size-8 text-amber-100" aria-hidden="true" />
+                    </motion.div>
+                    <motion.div
+                      initial={reduceMotion ? false : { x: 70, opacity: 0 }}
+                      animate={{ x: 0, opacity: 1 }}
+                      transition={{ duration: 1.1, ease: 'easeOut' }}
+                    >
+                      <JoyPrint signature={otherSignature} className="size-24 drop-shadow-[0_0_22px_rgba(169,223,255,0.4)]" />
+                    </motion.div>
+                  </div>
+                  <motion.h2
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.9, duration: 0.6 }}
+                    className="mt-7 font-serif text-4xl font-black leading-tight tracking-[-0.03em] text-white"
+                  >
+                    Your smile found<br />another smile.
+                  </motion.h2>
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.2, duration: 0.6 }}
+                    className="mt-3 text-sm text-white/70"
+                  >
+                    Two strangers. One {match.sharedShape.toLowerCase()} frequency.
+                  </motion.p>
+                  <motion.p
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.4, duration: 0.5 }}
+                    className="mt-4 font-serif text-5xl font-black text-amber-100"
+                  >
+                    {match.similarity}%
+                  </motion.p>
+                  <p className="text-xs font-semibold tracking-[0.2em] text-amber-100/70">JOY:D RESONANCE</p>
+                  <p className="mt-4 max-w-xs text-xs leading-relaxed text-white/45">
+                    {match.matchSource === 'live'
+                      ? 'A live anonymous JOY:D traveler is nearby. No profiles or identities are revealed.'
+                      : 'A waiting demo traveler helped awaken this local JOY:D universe.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onBeginAgain}
+                    className="mt-6 inline-flex items-center gap-2 rounded-full bg-amber-100 px-6 py-3 text-sm font-bold text-purple-950 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/30"
+                  >
+                    <RefreshCw className="size-4" aria-hidden="true" />
+                    Begin a new journey
+                  </button>
+                  <p className="mt-2 text-xs text-white/40">Every journey starts with a new smile.</p>
+                </div>
+              ) : matchStatus === 'searching' ? (
+                <div className="flex flex-col items-center">
+                  <motion.div
+                    animate={reduceMotion ? undefined : { rotate: 360 }}
+                    transition={{ duration: 6, ease: 'linear', repeat: Infinity }}
+                    className="relative size-40"
+                  >
+                    {[...Array(9)].map((_, index) => (
+                      <motion.span
+                        key={index}
+                        animate={reduceMotion ? undefined : { opacity: [0.2, 1, 0.2], scale: [0.6, 1.2, 0.6] }}
+                        transition={{ duration: 2.2, repeat: Infinity, delay: index * 0.2 }}
+                        className="absolute size-2 rounded-full bg-amber-100 shadow-[0_0_12px_3px_rgba(255,227,151,0.6)]"
+                        style={{
+                          left: `${50 + Math.cos((index / 9) * Math.PI * 2) * 42}%`,
+                          top: `${50 + Math.sin((index / 9) * Math.PI * 2) * 42}%`,
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                  <p className="mt-6 font-serif text-2xl font-black text-white">Reaching across the dark…</p>
+                  <p className="mt-2 text-sm text-white/60">Searching the JOY:D night sky.</p>
+                </div>
+              ) : (
+                <div className="flex w-full flex-col items-center">
+                  <p className="text-xs font-bold tracking-[0.3em] text-amber-100/80">ONE SMILE LEFT TO GIVE</p>
+                  <TrailComet colors={signature.colorTrail} className="my-6" />
+                  <h2 className="font-serif text-4xl font-black leading-tight tracking-[-0.03em] text-white">
+                    Let your smile<br />find another.
+                  </h2>
+                  <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/70">
+                    Somewhere out there, another smile made a {signature.shape.toLowerCase()} too. Smile again to reach them.
+                  </p>
+                  <div className="mt-7 w-full max-w-xs">
+                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
+                        style={{ width: `${Math.round(Math.max(smileCharge, Math.min(smileScore, 1) * 0.4) * 100)}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-amber-100/80">
+                      {smileCharge > 0 ? 'Your smile is reaching out…' : 'Smile to reach across the dark'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void findConnection()}
+                    className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-white/50 underline-offset-4 transition hover:text-white/80 hover:underline focus:outline-none"
+                  >
+                    or tap to find another
+                  </button>
+                  <p className="mt-5 max-w-xs text-[11px] leading-relaxed text-white/40">
+                    Only this playful signature is compared. No face, camera frame, name, account, or location is used.
+                  </p>
+                  {matchStatus === 'error' && (
+                    <p className="mt-3 text-xs text-rose-100/85">The matching constellation needs another moment. Please try again.</p>
+                  )}
+                </div>
               )}
-            </>
+            </motion.section>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Navigation — hidden on the connection chapter once matching begins. */}
+      {!(chapter === 3 && (match || matchStatus === 'searching')) && (
+        <div className="relative z-20 flex items-center justify-between px-6 pb-7">
+          <button
+            type="button"
+            onClick={() => (chapter === 0 ? onClose() : setChapter((c) => c - 1))}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-white/55 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            {chapter === 0 ? 'Back' : 'Prev'}
+          </button>
+          {chapter < chapterCount - 1 ? (
+            <button
+              type="button"
+              onClick={() => setChapter((c) => c + 1)}
+              className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-6 py-3 text-sm font-bold text-purple-950 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-amber-100/30"
+            >
+              {chapter === 2 ? 'Find another smile' : 'Next'}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </button>
+          ) : (
+            <span className="w-16" />
           )}
         </div>
-      </motion.article>
+      )}
     </motion.div>
   )
 }
