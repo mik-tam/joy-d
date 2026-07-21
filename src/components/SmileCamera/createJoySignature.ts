@@ -2,6 +2,7 @@ import type { SmileMoment } from './useSmileDetection'
 
 export type JoySignature = {
   colorTrail: [string, string, string]
+  creativeSeed: number
   heldForMs: number
   momentCode: string
   riseRate: number
@@ -50,6 +51,10 @@ export function createJoySignature(moment: SmileMoment): JoySignature {
 
   return {
     colorTrail: colorTrails[hash % colorTrails.length],
+    // A locally derived creative seed—not a face measurement or identifier.
+    // It lets the same playful signature choose a consistent starting
+    // aesthetic, while each later live-smile unlock can vary the next world.
+    creativeSeed: hash,
     heldForMs: Math.round(moment.heldForMs),
     momentCode: `JOY-${hash.toString(36).slice(-5).toUpperCase()}`,
     riseRate: Math.round(moment.riseRate * 100) / 100,
