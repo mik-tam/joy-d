@@ -72,6 +72,9 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   const activeWorldName = activeCapsule?.worldName ?? null
   const discoveryNumber = activeCapsuleIndex + 1
   const canGoDeeper = capsules.length < 3
+  // Kept in sync for the audio-unlock tap handler, which is registered once.
+  const chimesOnRef = useRef(true)
+  const activeCapsuleRef = useRef(activeCapsule)
 
   // Each smile shape is its own kind of key: quick bright peaks, long gentle
   // holds, or something in between.
@@ -153,6 +156,14 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   useEffect(() => {
     wowScoreRef.current = wowScore
   }, [wowScore])
+
+  useEffect(() => {
+    chimesOnRef.current = chimesOn
+  }, [chimesOn])
+
+  useEffect(() => {
+    activeCapsuleRef.current = activeCapsule
+  }, [activeCapsule])
 
   // Paint the hidden wonder's form as soon as its world opens, so the WOW
   // reveal is instant.
@@ -306,13 +317,23 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
 
   // Mobile keeps the Web Audio soundscape suspended until a user gesture (so
   // the world can be silent on entry even though sound reads "On"), and iOS
-  // can re-suspend it after the reading's audio element stops. Resuming on
-  // any tap makes the already-running soundscape audible on first touch and
-  // brings it back after a reading ends.
+  // can re-suspend it after the reading's audio element stops. On any tap we
+  // unlock/resume audio; on the FIRST tap we also rebuild the soundscape so
+  // its oscillators start on the now-unlocked context (some iOS versions
+  // won't play oscillators that were started while the context was suspended).
+  const firstAudioTapRef = useRef(false)
   useEffect(() => {
-    const resume = () => resumeJoySounds()
-    window.addEventListener('pointerdown', resume)
-    return () => window.removeEventListener('pointerdown', resume)
+    const onTap = () => {
+      resumeJoySounds()
+      if (!firstAudioTapRef.current) {
+        firstAudioTapRef.current = true
+        if (chimesOnRef.current && activeCapsuleRef.current) {
+          startWorldSoundscape(activeCapsuleRef.current.soundMood)
+        }
+      }
+    }
+    window.addEventListener('pointerdown', onTap)
+    return () => window.removeEventListener('pointerdown', onTap)
   }, [])
 
   useEffect(() => {

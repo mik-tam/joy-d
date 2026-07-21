@@ -2,6 +2,7 @@ type AudioContextConstructor = typeof AudioContext
 
 let audioContext: AudioContext | null = null
 let soundEnabled = false
+let audioUnlocked = false
 let worldSoundCleanup: (() => void) | null = null
 
 export function setJoySoundsEnabled(enabled: boolean) {
@@ -10,6 +11,7 @@ export function setJoySoundsEnabled(enabled: boolean) {
 
 export function stopJoySounds() {
   soundEnabled = false
+  audioUnlocked = false
   stopWorldSoundscape()
   if (audioContext?.state !== 'closed') {
     void audioContext?.close().catch(() => undefined)
@@ -22,15 +24,34 @@ export function stopWorldSoundscape() {
   worldSoundCleanup = null
 }
 
-// Mobile browsers keep a freshly created AudioContext suspended until a user
-// gesture, and iOS can re-suspend the shared audio session after an
-// HTMLAudioElement (the world reading) plays and stops. Resuming from within
-// a real tap makes the already-running soundscape oscillators audible again.
-// Cheap and idempotent — a no-op when the context is already running.
+// iOS Safari keeps an AudioContext silent until a one-shot buffer is played
+// inside a real user gesture — calling resume() alone is unreliable, above all
+// for a context first created OUTSIDE a gesture (JOY:D creates it from the
+// portal-chime timer on entry). Playing a single silent sample flips the audio
+// session to "active" so the world soundscape oscillators actually sound.
+// Safe to call on every tap; the real unlock only happens once.
+function unlockAudioContext(context: AudioContext) {
+  if (audioUnlocked) return
+  try {
+    const buffer = context.createBuffer(1, 1, 22050)
+    const source = context.createBufferSource()
+    source.buffer = buffer
+    source.connect(context.destination)
+    source.start(0)
+    audioUnlocked = true
+  } catch {
+    // If the unlock buffer fails we simply retry on the next tap.
+  }
+}
+
+// Called from within a user gesture (any tap in the portal). Unlocks the audio
+// session on mobile and resumes the context if it was suspended (on entry, or
+// after iOS re-suspends it once the reading's <audio> element stops).
 export function resumeJoySounds() {
-  if (!soundEnabled) return
   const context = getAudioContext()
-  if (context && context.state === 'suspended') {
+  if (!context) return
+  unlockAudioContext(context)
+  if (context.state === 'suspended') {
     void context.resume().catch(() => undefined)
   }
 }
@@ -61,6 +82,9 @@ export function startWorldSoundscape(soundMood: string) {
   if (!context) return
 
   stopWorldSoundscape()
+  // Toggling sound on is a user gesture, so unlock here too — the very first
+  // world can start its soundscape before any other tap has unlocked audio.
+  unlockAudioContext(context)
   void context.resume().catch(() => undefined)
   const profile = soundProfile(soundMood)
 
@@ -152,6 +176,7 @@ function playNotes(notes: number[], duration: number) {
   const context = getAudioContext()
   if (!context) return
 
+  unlockAudioContext(context)
   void context.resume().catch(() => undefined)
   const start = context.currentTime + 0.02
 
