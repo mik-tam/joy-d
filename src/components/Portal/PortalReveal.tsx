@@ -552,29 +552,45 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             <p className="mt-1.5 text-sm italic text-amber-50/90 drop-shadow-[0_1px_8px_rgba(9,4,25,0.8)]">
               “{activeCapsule.quote}”
             </p>
-            <AnimatePresence initial={false}>
-              {!storyCollapsed && (
-                <motion.p
+            <AnimatePresence initial={false} mode="wait">
+              {!storyCollapsed ? (
+                <motion.div
                   key="world-story"
                   initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.25, ease: 'easeOut' }}
-                  className="mx-auto mt-3 max-w-lg rounded-2xl bg-[#10051f]/35 px-4 py-2.5 text-xs leading-relaxed text-white/85 backdrop-blur-[3px] drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)] sm:text-sm"
+                  transition={{ duration: reduceMotion ? 0 : 0.22, ease: 'easeOut' }}
+                  className="mx-auto mt-3 max-w-lg rounded-2xl bg-[#10051f]/35 px-4 pb-1 pt-2.5 backdrop-blur-[3px] drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]"
                 >
-                  {activeCapsule.story}
-                </motion.p>
+                  <p className="text-xs leading-relaxed text-white/85 sm:text-sm">
+                    {activeCapsule.story}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStoryCollapsed(true)}
+                    aria-label="Hide story"
+                    className="pointer-events-auto mx-auto mt-0.5 flex items-center justify-center p-1 text-white/55 transition hover:text-white active:scale-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    <ChevronUp className="size-4" aria-hidden="true" />
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.button
+                  key="world-story-show"
+                  type="button"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.2 }}
+                  onClick={() => setStoryCollapsed(false)}
+                  aria-expanded={false}
+                  className="pointer-events-auto mx-auto mt-3 inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#160a31]/55 px-3.5 py-1.5 text-xs font-semibold text-white/80 backdrop-blur transition active:scale-90 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:text-sm"
+                >
+                  <ChevronDown className="size-4" aria-hidden="true" />
+                  Show story
+                </motion.button>
               )}
             </AnimatePresence>
-            <button
-              type="button"
-              onClick={() => setStoryCollapsed((value) => !value)}
-              aria-expanded={!storyCollapsed}
-              className="pointer-events-auto mx-auto mt-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#160a31]/60 px-3 py-1 text-[10px] font-semibold text-white/70 backdrop-blur transition active:scale-90 hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40"
-            >
-              {storyCollapsed ? <ChevronDown className="size-3.5" aria-hidden="true" /> : <ChevronUp className="size-3.5" aria-hidden="true" />}
-              {storyCollapsed ? 'Show story' : 'Hide story'}
-            </button>
           </motion.div>
 
           <motion.div

@@ -102,18 +102,7 @@ function wonderPocket(seed: number) {
 }
 
 function motionProps(element: WorldSceneElement, index: number, reduceMotion: boolean) {
-  if (reduceMotion) return {}
-  // Waves always swell sideways, and far more than anything else — a large,
-  // quick horizontal sway reads as an obvious rolling ocean current rather
-  // than the gentle drift the other elements get.
-  if (element.sprite === 'wave') {
-    const waveDrift = 110 + (index % 3) * 30
-    return {
-      animate: { x: [0, waveDrift, 0, -waveDrift, 0] },
-      transition: { duration: 3.6 + (index % 3) * 0.7, repeat: Infinity, ease: 'easeInOut' as const },
-    }
-  }
-  if (element.motion === 'still') return {}
+  if (reduceMotion || element.motion === 'still') return {}
   const drift = 18 + (index % 3) * 9
   switch (element.motion) {
     case 'drift':
@@ -207,22 +196,12 @@ export function WorldStage({ capsule, images, smileScore = 0, colorTrail }: Worl
       aria-hidden="true"
     >
       {images?.backdrop && (
-        // The ocean/backdrop itself rolls sideways continuously — this is the
-        // big "waves" motion. It's zoomed in (scale) to give overscan room so
-        // the horizontal sway never exposes the image edges. Sprites don't
-        // move with it, so the roll reads as parallax depth on the water.
         <motion.img
           src={images.backdrop}
           alt=""
-          initial={{ opacity: 0, scale: 1.22 }}
-          animate={reduceMotion
-            ? { opacity: 0.9, scale: 1.22 }
-            : { opacity: 0.9, scale: 1.22, x: ['0%', '8%', '0%', '-8%', '0%'] }}
-          transition={{
-            opacity: { duration: reduceMotion ? 0.2 : 2.2, ease: 'easeOut' },
-            scale: { duration: reduceMotion ? 0.2 : 2.2, ease: 'easeOut' },
-            x: { duration: 7, repeat: Infinity, ease: 'easeInOut' },
-          }}
+          initial={{ opacity: 0, scale: 1.06 }}
+          animate={{ opacity: 0.9, scale: 1 }}
+          transition={{ duration: reduceMotion ? 0.2 : 2.2, ease: 'easeOut' }}
           className="absolute inset-0 h-full w-full object-cover"
         />
       )}
