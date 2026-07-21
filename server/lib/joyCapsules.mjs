@@ -349,7 +349,7 @@ export async function handleJoyCapsuleRequest(requestBody) {
       try {
         return useOpenRouter
           ? await client.chat.completions.create({
-              model: process.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini',
+              model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
               messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
@@ -362,6 +362,9 @@ export async function handleJoyCapsuleRequest(requestBody) {
                   schema: capsuleSchema,
                 },
               },
+              // Gemini Flash otherwise burns the output budget on hidden
+              // "thinking" tokens and can return empty structured JSON.
+              reasoning: { effort: 'none' },
             }, { signal: controller.signal })
           : await client.responses.create({
               model: process.env.OPENAI_MODEL || 'gpt-5.6',
@@ -424,13 +427,19 @@ export async function handleJoyCapsuleRequest(requestBody) {
     }
   } catch (error) {
     const status = typeof error?.status === 'number' ? error.status : undefined
+    const message = error instanceof Error ? error.message : ''
+    const providerBlocked = status === 403 && /terms of service|prohibited/i.test(message)
     const code =
       error?.name === 'AbortError'
         ? 'AI_TIMEOUT'
         : error?.code === 'insufficient_quota'
           ? 'AI_QUOTA_EXHAUSTED'
-        : status === 401 || status === 403
+        : providerBlocked
+          ? 'AI_MODEL_UNAVAILABLE'
+        : status === 401
           ? 'AI_AUTH_FAILED'
+          : status === 403
+            ? 'AI_AUTH_FAILED'
           : status === 429
             ? 'AI_RATE_LIMITED'
             : status === 404
@@ -439,7 +448,7 @@ export async function handleJoyCapsuleRequest(requestBody) {
 
     console.error('JOY:D capsule request failed', {
       code: error?.code,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message,
       name: error?.name,
       status,
       type: error?.type,
