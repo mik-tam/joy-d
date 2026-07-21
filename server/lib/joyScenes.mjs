@@ -4,6 +4,26 @@ import OpenAI from 'openai'
 // the Express production host) and api/joy-scenes.js (Vercel).
 
 const worldImagesEnabled = (process.env.JOYD_WORLD_IMAGES ?? 'on') !== 'off'
+const sceneSprites = ['lantern-boat', 'crescent-moon', 'garden-door', 'cloud', 'wave', 'star']
+
+function normalizeElements(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 6) return null
+  const elements = []
+  for (const entry of value) {
+    if (typeof entry === 'string') {
+      if (!entry.length || entry.length > 320) return null
+      elements.push({ description: entry, sprite: null })
+      continue
+    }
+    if (!entry || typeof entry !== 'object') return null
+    if (typeof entry.description !== 'string' || !entry.description.length || entry.description.length > 320) {
+      return null
+    }
+    if (entry.sprite != null && !sceneSprites.includes(entry.sprite)) return null
+    elements.push({ description: entry.description, sprite: entry.sprite ?? null })
+  }
+  return elements
+}
 
 function isSafeSceneImageRequest(value) {
   if (!value || typeof value !== 'object') return false
@@ -14,10 +34,18 @@ function isSafeSceneImageRequest(value) {
   if (value.backdrop !== undefined && (typeof value.backdrop !== 'string' || value.backdrop.length > 320)) {
     return false
   }
-  return Array.isArray(value.elements) && value.elements.length >= 1 && value.elements.length <= 6
-    && value.elements.every(
-      (element) => typeof element === 'string' && element.length > 0 && element.length <= 320,
-    )
+  return Boolean(normalizeElements(value.elements))
+}
+
+function elementPrompt(description, sprite, hasCastDoorway) {
+  const base = `${description}. A single isolated subject, centered, on a fully transparent background. Clear readable silhouette with strong contrast, soft outer glow optional. No ground, no cast shadow, no background scenery, no border.`
+  if (sprite === 'garden-door') {
+    return `${base} This may be exactly one whimsical doorway or arch — never a cluster of doors.`
+  }
+  if (hasCastDoorway || sprite) {
+    return `${base} This subject is NOT a door, doorway, arch, gate, portal, or keyhole. Do not paint architectural openings.`
+  }
+  return `${base} Avoid doors, arches, gates, and portals unless the description unmistakably requires one.`
 }
 
 // Generates the world's visuals from the story itself: transparent sprites
@@ -42,7 +70,9 @@ export async function handleJoySceneRequest(requestBody) {
     return { status: 503, body: { code: 'IMAGE_GEN_UNAVAILABLE' } }
   }
 
-  const { look, backdrop, elements } = requestBody
+  const { look, backdrop } = requestBody
+  const elements = normalizeElements(requestBody.elements)
+  const hasCastDoorway = elements.some((element) => element.sprite === 'garden-door')
   const imageModel = useOpenRouterImages
     ? process.env.OPENROUTER_IMAGE_MODEL || 'openai/gpt-image-1-mini'
     : process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
@@ -110,16 +140,19 @@ export async function handleJoySceneRequest(requestBody) {
   try {
     // Cap generated sprites to keep each world fast and inexpensive.
     const cappedElements = elements.slice(0, 4)
+    const backdropRule = hasCastDoorway
+      ? 'Landscape and atmosphere only — no doorway, arch, gate, portal, or keyhole anywhere in the backdrop.'
+      : 'At most one distant architectural opening in the whole world; prefer pure landscape with no doors.'
     const [backdropImage, ...elementImages] = await Promise.all([
       backdrop
         ? generateOne(
-            `${backdrop}. A full-frame environmental composition with readable depth and enough open space that foreground subjects can contrast clearly against it. Avoid making the backdrop so busy or same-valued that floating subjects disappear. ${imageConstraints} LOOK: ${look}`,
+            `${backdrop}. A full-frame environmental composition with readable depth and enough open space that foreground subjects can contrast clearly against it. Avoid making the backdrop so busy or same-valued that floating subjects disappear. ${backdropRule} ${imageConstraints} LOOK: ${look}`,
             { size: '1536x1024', transparent: false },
           )
         : Promise.resolve(null),
-      ...cappedElements.map((description) =>
+      ...cappedElements.map((element) =>
         generateOne(
-          `${description}. A single isolated subject, centered, on a fully transparent background. Clear readable silhouette with strong contrast, soft outer glow optional. No ground, no cast shadow, no background scenery, no border. ${imageConstraints} LOOK: ${look}`,
+          `${elementPrompt(element.description, element.sprite, hasCastDoorway)} ${imageConstraints} LOOK: ${look}`,
           { size: '1024x1024', transparent: true },
         ),
       ),

@@ -131,6 +131,18 @@ function overlapsHiddenWonder(description, surpriseTokens) {
   return shared >= 2
 }
 
+function mentionsDoor(text) {
+  return /\b(doors?|doorways?|arch(?:way|es)?|portals?|gates?|thresholds?|keyholes?|entryways?)\b/i.test(text)
+}
+
+function stripDoorLanguage(text) {
+  return text
+    .replace(/\b(doors?|doorways?|arch(?:way|es)?|portals?|gates?|thresholds?|keyholes?|entryways?)\b/gi, 'glow')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+,/g, ',')
+    .trim()
+}
+
 // A malformed scene never fails the capsule: the client composes a
 // deterministic fallback scene instead. Hidden-wonder lookalikes are
 // stripped so the surprise stays invisible until a WOW face reveals it.
@@ -157,15 +169,29 @@ function sanitizeScene(value, surprise = '') {
     if (typeof element.description !== 'string' || !element.description.trim() || element.description.length > 300) {
       return undefined
     }
-    const description = element.description.trim()
+    let description = element.description.trim()
+    let sprite = element.sprite
     if (overlapsHiddenWonder(description, surpriseTokens)) continue
-    if (element.sprite === 'garden-door') {
-      doorwayCount += 1
-      if (doorwayCount > 1) continue
+
+    // At most one doorway in the whole cast. Extra door sprites are dropped;
+    // door-like wording on non-door sprites is rewritten so image gen cannot
+    // paint a second arch into the world.
+    const doorish = sprite === 'garden-door' || mentionsDoor(description)
+    if (doorish) {
+      if (doorwayCount >= 1) {
+        if (sprite === 'garden-door') continue
+        description = stripDoorLanguage(description)
+        if (!description) continue
+        sprite = sprite === 'garden-door' ? 'star' : sprite
+      } else {
+        sprite = 'garden-door'
+        doorwayCount += 1
+      }
     }
+
     elements.push({
       description,
-      sprite: element.sprite,
+      sprite,
       size: element.size,
       motion: element.motion,
       x: Math.round(element.x),
@@ -174,7 +200,13 @@ function sanitizeScene(value, surprise = '') {
     })
   }
   if (elements.length < 3) return undefined
-  return { backdrop: value.backdrop.trim(), biome: value.biome, elements: spreadSceneElements(elements) }
+
+  // Backdrop stays landscape-only once a doorway is already cast (or whenever
+  // it tries to invent arches of its own).
+  let backdrop = value.backdrop.trim()
+  if (mentionsDoor(backdrop)) backdrop = stripDoorLanguage(backdrop)
+
+  return { backdrop, biome: value.biome, elements: spreadSceneElements(elements) }
 }
 
 const capsuleSchema = {
@@ -289,7 +321,7 @@ export async function handleJoyCapsuleRequest(requestBody) {
       'This is opened by a happy smile, so every world must feel emotionally safe, hopeful, and delightful even when its palette is dark or strange. Weird and adult-curious is welcome; creepy is not. Never use horror, menace, gore, death, skulls, predatory creatures, haunted or blank stares, threatening figures, sinister dolls, porcelain dolls, pale ghostly children, distorted faces, weeping faces, evil eyes, or despair. Give every unusual image a warm, curious, or playful anchor.',
       `The required art direction for this door is: ${artDirection} The returned visualDirection MUST state and preserve this direction clearly; it controls every generated image in this world.`,
       'The `surprise` is a hidden wonder: a single delightful visual event or object. Write it only in the `surprise` field. It must be completely absent from the visible scene. Never describe, name, depict, foreshadow, silhouette, or include it in the `scene.backdrop`, `scene.elements`, worldName, story, or quote. Do not place a second glowing doorway, secret arch, or lookalike stand-in for the hidden wonder in the visible scene; the traveler must not see it until a WOW face reveals it.',
-      'You also cast the visible scene. Every element gets a `description`: a vivid 8-20 word visual description of that exact thing as it appears in THIS story, weaving in the palette and art direction from visualDirection. The scene `backdrop` is one sentence describing the distant scenery of this world. Pick each element\'s closest stand-in `sprite` from the kit: lantern-boat, crescent-moon, garden-door, cloud, wave, star. These are interaction stand-ins, not a requirement to include their literal subject. Prefer at most one doorway or arch in the whole scene. Sizes: tiny, small, grand, colossal. Motions: drift, bob, spin-slow, float, still. Positions are percentages (x 0-100 left-to-right, y 0-100 top-to-bottom).',
+      'You also cast the visible scene. Every element gets a `description`: a vivid 8-20 word visual description of that exact thing as it appears in THIS story, weaving in the palette and art direction from visualDirection. The scene `backdrop` is one sentence of distant scenery with NO doorway, arch, gate, or portal. Pick each element\'s closest stand-in `sprite` from the kit: lantern-boat, crescent-moon, garden-door, cloud, wave, star. These are interaction stand-ins, not a requirement to include their literal subject. HARD RULE: at most ONE doorway/arch/portal in the entire world — use `garden-door` for it if needed, and never describe doors on any other sprite or in the backdrop. Sizes: tiny, small, grand, colossal. Motions: drift, bob, spin-slow, float, still. Positions are percentages (x 0-100 left-to-right, y 0-100 top-to-bottom).',
       'Compose for readability: floating subjects must have strong value and color contrast against the backdrop so they remain easy to see. Keep subjects out of the top title band (about y 0-22), the bottom control band (about y 72-100), the bottom-left smile meter, and the top-right sound controls. Subjects may overlap each other a little for depth, but must not cover the UI and must remain individually readable.',
       'Cast 3 to 6 elements and compose an original scene with impossible scale, depth, and a clear focal point. The story, descriptions, and scene must clearly belong to the same world.',
       'Return only the requested JSON.',

@@ -228,6 +228,13 @@ export function WorldStage({ capsule, images, smileScore = 0, colorTrail }: Worl
       {scene.elements.map((element, index) => {
         const imageUrl = images?.elements[index]
         if (!imageUrl) return null
+        // Never paint more than one doorway sprite, even from older capsules.
+        if (
+          element.sprite === 'garden-door'
+          && scene.elements.findIndex((candidate) => candidate.sprite === 'garden-door') !== index
+        ) {
+          return null
+        }
         return (
           <SceneSprite
             key={`${element.sprite}-${index}`}

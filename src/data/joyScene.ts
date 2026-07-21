@@ -49,7 +49,7 @@ const fallbackArrangements: FallbackArrangement[] = [
     ],
   },
   {
-    backdrop: 'a colossal tide cresting beneath a doorway that stands on nothing',
+    backdrop: 'a colossal tide cresting beneath a floating lantern that stands on nothing',
     elements: [
       { description: 'a tiny crescent moon bobbing near the ground like a lost toy', sprite: 'crescent-moon', size: 'tiny', x: 22, y: 74, flip: false, motion: 'bob' },
       { description: 'a colossal painted wave cresting across the whole horizon', sprite: 'wave', size: 'colossal', x: 50, y: 88, flip: false, motion: 'drift' },

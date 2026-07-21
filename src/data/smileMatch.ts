@@ -1,12 +1,26 @@
 import type { JoySignature } from '../components/SmileCamera/createJoySignature'
 
+const matchShapes: JoySignature['shape'][] = ['Gentle Bloom', 'Bright Spark', 'Slow Sunrise']
+
+export type MatchWorldSummary = {
+  quote: string
+  sprite?: string
+  worldName: string
+}
+
 export type SmileMatch = {
   matchColorTrail?: string[]
+  matchSignature?: {
+    colorTrail: [string, string, string]
+    heldForMs: number
+    momentCode: string
+    riseRate: number
+    shape: JoySignature['shape']
+    signalPercent: number
+    wonderTitle: string
+  }
   matchSource: 'live' | 'waiting'
-  matchWorlds?: Array<{
-    quote: string
-    worldName: string
-  }>
+  matchWorlds?: MatchWorldSummary[]
   sharedShape?: JoySignature['shape']
   similarity?: number
 }
@@ -19,7 +33,7 @@ const clientSessionId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
 
 export async function findSmileMatch(
   signature: JoySignature,
-  worlds: Array<{ quote: string; worldName: string }>,
+  worlds: MatchWorldSummary[],
 ): Promise<SmileMatch> {
   let response: Response
 
@@ -31,8 +45,12 @@ export async function findSmileMatch(
         clientSessionId,
         signature: {
           colorTrail: signature.colorTrail,
+          heldForMs: signature.heldForMs,
+          momentCode: signature.momentCode,
+          riseRate: signature.riseRate,
           shape: signature.shape,
           signalPercent: signature.signalPercent,
+          wonderTitle: signature.wonderTitle,
         },
         worlds,
       }),
@@ -67,12 +85,38 @@ export async function findSmileMatch(
     match.matchColorTrail = []
   }
   match.matchWorlds = match.matchWorlds.filter(
-    (world): world is { quote: string; worldName: string } =>
+    (world): world is MatchWorldSummary =>
       Boolean(world)
       && typeof world === 'object'
       && typeof world.worldName === 'string'
       && typeof world.quote === 'string',
   )
+
+  if (match.matchSignature && typeof match.matchSignature === 'object') {
+    const detail = match.matchSignature
+    if (
+      !matchShapes.includes(detail.shape)
+      || !Number.isInteger(detail.signalPercent)
+      || !Number.isInteger(detail.heldForMs)
+      || typeof detail.riseRate !== 'number'
+      || typeof detail.momentCode !== 'string'
+      || typeof detail.wonderTitle !== 'string'
+      || !Array.isArray(detail.colorTrail)
+      || detail.colorTrail.length < 3
+    ) {
+      match.matchSignature = undefined
+    } else {
+      match.matchSignature = {
+        colorTrail: detail.colorTrail.slice(0, 3) as [string, string, string],
+        heldForMs: detail.heldForMs,
+        momentCode: detail.momentCode,
+        riseRate: detail.riseRate,
+        shape: detail.shape,
+        signalPercent: detail.signalPercent,
+        wonderTitle: detail.wonderTitle,
+      }
+    }
+  }
 
   return match as SmileMatch
 }
