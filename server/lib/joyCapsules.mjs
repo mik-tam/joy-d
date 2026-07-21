@@ -53,15 +53,21 @@ const spriteFootprint = { tiny: 5, small: 9, grand: 17, colossal: 29 }
 function clampSceneElement(element) {
   const halfWidth = spriteFootprint[element.size]
   const halfHeight = halfWidth * 0.7
-  // Keep floating subjects out of the portal UI chrome: title band, bottom
-  // controls, smile meter (bottom-left), and sound controls (top-right).
+  // Keep floating subjects out of the portal UI chrome: title/story band,
+  // bottom controls, smile meter (bottom-left), and sound controls (top-right).
   // Subjects may still overlap each other slightly for depth.
   let minX = halfWidth + 1
   let maxX = 99 - halfWidth
-  let minY = Math.max(22 + halfHeight * 0.35, 10 + halfHeight)
-  let maxY = Math.min(70 - halfHeight * 0.2, 90 - halfHeight)
-  if (element.y > 58) minX = Math.max(minX, 30)
-  if (element.y < 28) maxX = Math.min(maxX, 78)
+  // Mid-stage band sits below the story card and above the CTA row.
+  let minY = Math.max(48, 10 + halfHeight)
+  let maxY = Math.min(66 - halfHeight * 0.15, 72 - halfHeight)
+  // Soft side preference so the center story panel stays clear.
+  if (element.x > 28 && element.x < 72) {
+    if (element.x < 50) maxX = Math.min(maxX, 24)
+    else minX = Math.max(minX, 76)
+  }
+  if (element.y > 58) minX = Math.max(minX, 32)
+  if (element.y < 30) maxX = Math.min(maxX, 76)
   element.x = Math.min(maxX, Math.max(minX, element.x))
   element.y = Math.min(maxY, Math.max(minY, element.y))
 }

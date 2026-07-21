@@ -20,10 +20,20 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   min-width: 320px;
-  min-height: 100vh;
+  height: 100%;
   margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 .joy-paper-grain {

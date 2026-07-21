@@ -11,7 +11,7 @@ export function Home() {
   }
 
   return (
-    <main className="joy-landing relative isolate flex h-svh items-center justify-center overflow-hidden bg-[#281941] px-6 py-12">
+    <main className="joy-landing relative isolate flex h-dvh max-h-dvh items-center justify-center overflow-hidden overscroll-none bg-[#281941] px-6 py-12">
       <LayeredLanding />
       <VoyagingBoat />
 
@@ -19,7 +19,7 @@ export function Home() {
         initial={reduceMotion ? false : { opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="absolute top-9 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap text-center text-[0.68rem] font-bold tracking-[0.25em] text-amber-100/90 sm:top-11 sm:text-xs sm:tracking-[0.32em] [@media(max-height:560px)]:hidden"
+        className="absolute top-9 left-1/2 z-30 -translate-x-1/2 whitespace-nowrap text-center text-[0.68rem] font-bold tracking-[0.25em] text-amber-100/90 drop-shadow-[0_1px_2px_rgba(20,8,42,0.95),0_2px_10px_rgba(20,8,42,0.75)] sm:top-11 sm:text-xs sm:tracking-[0.32em] [@media(max-height:560px)]:hidden"
       >
         JOY:D — A TINY PORTAL TO DELIGHT
       </motion.p>
@@ -88,6 +88,9 @@ function VoyagingBoat() {
 
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden="true">
+      {/* Sea fill under the wave art so rubber-band / tall phones never flash
+          an empty purple strip at the bottom edge. */}
+      <div className="absolute inset-x-0 bottom-0 h-[22%] bg-gradient-to-t from-[#1a2848] via-[#2a5f6e] to-transparent" />
       {/* Wave placement is self-relative: each band is anchored to the screen
           bottom and pushed down by a percentage of its own artwork height, so
           the composition scales continuously across every window size. */}
@@ -102,7 +105,7 @@ function VoyagingBoat() {
           alt=""
           animate={reduceMotion ? undefined : { x: [0, '2.5vw', '-2vw', 0], y: [0, -4, -1, 0] }}
           transition={{ duration: 138, repeat: Infinity, ease: 'easeInOut', delay: 9.9 }}
-          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[14%] landscape:translate-y-[calc(70%-32vh)]"
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[8%] sm:translate-y-[14%] landscape:translate-y-[calc(70%-32vh)]"
         />
       </motion.div>
       <motion.div
@@ -116,7 +119,7 @@ function VoyagingBoat() {
           alt=""
           animate={reduceMotion ? undefined : { x: [0, '-3vw', '2vw', 0], y: [0, -5, -2, 0] }}
           transition={{ duration: 116, repeat: Infinity, ease: 'easeInOut', delay: 6.8 }}
-          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[33%] landscape:translate-y-[calc(70%-22vh)]"
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -translate-x-1/2 translate-y-[24%] sm:translate-y-[33%] landscape:translate-y-[calc(70%-22vh)]"
         />
       </motion.div>
       <motion.img
@@ -152,7 +155,7 @@ function VoyagingBoat() {
           alt=""
           animate={reduceMotion ? undefined : { x: [0, '2vw', '-2.5vw', 0], y: [0, -3, -1, 0] }}
           transition={{ duration: 154, repeat: Infinity, ease: 'easeInOut', delay: 8.2 }}
-          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -scale-x-100 -translate-x-1/2 translate-y-[54%] landscape:translate-y-[calc(70%-12vh)]"
+          className="relative left-1/2 h-auto w-[max(115vw,95vh)] max-w-none -scale-x-100 -translate-x-1/2 translate-y-[42%] sm:translate-y-[54%] landscape:translate-y-[calc(70%-12vh)]"
         />
       </motion.div>
     </div>

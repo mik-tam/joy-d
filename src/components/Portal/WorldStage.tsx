@@ -67,6 +67,56 @@ const spriteWidths: Record<WorldSceneElement['size'], string> = {
   colossal: 'min(58vw, 44rem)',
 }
 
+const spriteHalf: Record<WorldSceneElement['size'], number> = {
+  tiny: 5,
+  small: 9,
+  grand: 17,
+  colossal: 26,
+}
+
+// Keep floating subjects out of portal chrome: story panel (center-top),
+// bottom controls, smile meter, and corner buttons.
+function placeAwayFromUi(x: number, y: number, size: WorldSceneElement['size'] = 'small') {
+  const half = spriteHalf[size]
+  const floorY = size === 'colossal' || size === 'grand' ? 56 : 48
+  let nextX = Math.min(96 - half, Math.max(half + 2, x))
+  let nextY = Math.min(68 - half * 0.2, Math.max(22, y))
+
+  // Story panel sits in the upper center — clear that whole band.
+  if (nextY < floorY) {
+    nextY = floorY
+    if (nextX > 24 && nextX < 76) {
+      nextX = nextX < 50 ? Math.min(nextX, 18) : Math.max(nextX, 82)
+    }
+  }
+  // Bottom CTA band.
+  if (nextY > 70) nextY = 62
+  // Smile meter pocket (bottom-left).
+  if (nextX < 28 && nextY > 58) {
+    nextX = Math.max(nextX, 34)
+    nextY = Math.min(nextY, 56)
+  }
+  // Sound controls (top-right).
+  if (nextX > 78 && nextY < 30) {
+    nextX = 72
+    nextY = Math.max(nextY, floorY)
+  }
+
+  return { x: nextX, y: nextY }
+}
+
+function wonderPocket(seed: number) {
+  const pockets = [
+    { left: 16, top: 56 },
+    { left: 84, top: 54 },
+    { left: 20, top: 62 },
+    { left: 80, top: 60 },
+    { left: 14, top: 50 },
+    { left: 86, top: 48 },
+  ]
+  return pockets[seed % pockets.length]
+}
+
 function motionProps(element: WorldSceneElement, index: number, reduceMotion: boolean) {
   if (reduceMotion || element.motion === 'still') return {}
   const drift = 18 + (index % 3) * 9
@@ -114,13 +164,15 @@ function SceneSprite({
   const driftX = Math.sin(index * 2.1 + 0.8) * 28 * sway
   const driftY = -Math.cos(index * 1.7 + 0.4) * 32 * sway
 
+  const placed = placeAwayFromUi(element.x, element.y, element.size)
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.7 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: reduceMotion ? 0 : 0.6 + index * 0.25, duration: reduceMotion ? 0.2 : 1.1, ease: 'easeOut' }}
       className="absolute"
-      style={{ left: `${element.x}%`, top: `${element.y}%`, width, translate: '-50% -50%' }}
+      style={{ left: `${placed.x}%`, top: `${placed.y}%`, width, translate: '-50% -50%' }}
     >
       <div
         style={{
@@ -240,9 +292,11 @@ export function WorldSecret({
   const scene = resolveScene(capsule)
   const style = biomeStyles[scene.biome]
   const seed = hashWorld(`${capsule.worldName}:${capsule.visualDirection}`)
-  const anchor = scene.elements[seed % scene.elements.length]
-  const left = Math.min(74, Math.max(28, anchor.x + ((seed >> 5) % 11) - 5))
-  const top = Math.min(64, Math.max(28, anchor.y + ((seed >> 8) % 11) - 5))
+  // Always park the wonder in a side pocket below the story panel so it never
+  // covers the readable UI — even when the cast anchor sits in the center.
+  const pocket = wonderPocket(seed)
+  const left = pocket.left
+  const top = pocket.top
   const hiddenLabel = capsule.surprise.length > 82 ? `${capsule.surprise.slice(0, 79)}…` : capsule.surprise
   const transformed = hiddenRevealed && Boolean(revealedImage)
 
@@ -276,6 +330,7 @@ export function WorldSecret({
           color: style.glow,
           left: `${left}%`,
           top: `${top}%`,
+          translate: '-50% -50%',
           filter: `brightness(${1 + wowCharge * 0.9}) saturate(${1 + wowCharge * 0.5})`,
         }}
         aria-label={hiddenRevealed ? 'Hidden wonder discovered' : `Reveal the hidden wonder with a WOW face — or tap: ${hiddenLabel}`}
@@ -302,7 +357,7 @@ export function WorldSecret({
           initial={{ opacity: 0, scale: 0.25 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: reduceMotion ? 0.3 : 1.1, ease: 'easeOut' }}
-          className="pointer-events-none absolute z-10 w-[min(30vw,18rem)]"
+          className="pointer-events-none absolute z-10 w-[min(26vw,13rem)] sm:w-[min(28vw,15rem)]"
           style={{ left: `${left}%`, top: `${top}%`, translate: '-50% -50%' }}
           aria-hidden="true"
         >

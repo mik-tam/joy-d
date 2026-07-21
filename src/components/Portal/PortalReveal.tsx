@@ -317,7 +317,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 isolate flex items-center justify-center overflow-hidden bg-[#0b0518] px-6 py-10"
+      className="fixed inset-0 z-50 isolate flex items-center justify-center overflow-hidden overscroll-none bg-[#0b0518] px-6 py-10"
       role="dialog"
       aria-modal="true"
       aria-labelledby="portal-title"
@@ -453,7 +453,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: reduceMotion ? 0 : 0.9, duration: 0.7 }}
-            className="pointer-events-none absolute inset-x-0 top-14 z-10 mx-auto max-w-2xl px-14 text-center sm:top-12 sm:px-16"
+            className="pointer-events-none absolute inset-x-0 top-14 z-30 mx-auto max-w-2xl px-14 text-center sm:top-12 sm:px-16"
           >
             <p className="text-[10px] font-bold tracking-[0.3em] text-white/70 drop-shadow-[0_1px_6px_rgba(9,4,25,0.8)]">
               DOOR {discoveryNumber} OF 3
@@ -473,7 +473,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: reduceMotion ? 0 : 1.2, duration: 0.6 }}
-            className="absolute inset-x-0 bottom-16 z-10 flex flex-col items-center gap-2.5 px-6 sm:bottom-6"
+            className="absolute inset-x-0 bottom-16 z-30 flex flex-col items-center gap-2.5 px-6 sm:bottom-6"
           >
             {deepeningError && (
               <p className="max-w-sm rounded-xl bg-rose-100/10 px-3 py-2 text-center text-xs leading-relaxed text-rose-50/85 backdrop-blur">
@@ -596,8 +596,9 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         )}
       </div>
 
+      {/* Compact smile meter on phones; full status card on desktop. */}
       <div
-        className="absolute bottom-3 left-3 z-20 flex w-[min(11.5rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/75 px-3 py-2 backdrop-blur sm:bottom-5 sm:left-5"
+        className="absolute bottom-3 left-3 z-20 flex w-[min(11.5rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/75 px-3 py-2 backdrop-blur sm:hidden"
         role="status"
         aria-label={
           smileStatus === 'no-face'
@@ -624,6 +625,39 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.06em] text-amber-100/90">
           {Math.round(Math.min(smileScore, 1) * 100)}%
         </span>
+      </div>
+
+      <div className="absolute bottom-5 left-5 z-20 hidden max-w-[15rem] items-start gap-3 rounded-2xl border border-white/15 bg-[#160a31]/65 px-4 py-3 backdrop-blur sm:flex">
+        <motion.span
+          animate={reduceMotion ? undefined : { opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="mt-1 size-2.5 shrink-0 rounded-full bg-amber-200"
+          style={{ boxShadow: `0 0 ${6 + smileScore * 14}px ${2 + smileScore * 5}px rgba(255,227,151,${0.25 + smileScore * 0.5})` }}
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold leading-snug text-white/85">
+            {smileStatus === 'no-face'
+              ? 'Step into view — this world dims without you'
+              : smileStatus === 'unavailable' || smileStatus === 'idle'
+                ? 'Smile signal resting — tapping works too'
+                : 'Your smile is lighting this world'}
+          </p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
+                style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.08em] text-amber-100/90">
+              {Math.round(Math.min(smileScore, 1) * 100)}%
+            </span>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-snug text-white/45">
+            Camera stays in your browser only. Leaving the portal closes it.
+          </p>
+        </div>
       </div>
 
       <AnimatePresence>

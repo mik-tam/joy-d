@@ -215,7 +215,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
   }[smileStatus]
 
   return (
-    <main className="relative isolate h-svh overflow-hidden bg-[#1c1136]">
+    <main className="relative isolate h-dvh max-h-dvh overflow-hidden overscroll-none bg-[#1c1136]">
       <motion.div
         animate={
           entering
@@ -228,8 +228,8 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
         style={{ transformOrigin: '50% 46%' }}
         className={`absolute inset-0 flex flex-col items-center px-5 sm:px-6 ${
           smileUnlocked
-            ? 'justify-start overflow-y-auto overscroll-contain py-16 pb-8 sm:justify-center sm:py-10'
-            : 'justify-center overflow-hidden'
+            ? 'justify-start overflow-y-auto overscroll-none py-14 pb-6 sm:justify-center sm:overflow-hidden sm:py-10'
+            : 'justify-center overflow-hidden overscroll-none'
         }`}
       >
       {/* The doorway from the landing page, drawn close: the glowing arch and
