@@ -44,6 +44,7 @@ A few decisions I made with Codex along the way:
 - Live world painting: every world's visuals generate in real time, with image prompts following an explicit per-world art direction rather than a single default visual style. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or straight through OpenAI's `gpt-image-1` otherwise. `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit; the generated art blooms in as it arrives. Without image credit, the kit is still the complete experience
 - Express for local dev/preview and any persistent-Node host; the same three route handlers also run as Vercel serverless functions for a Vercel deployment (see Deploy below)
 - Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
+- "Hear this world" reads the capsule aloud with OpenAI's TTS API (`gpt-4o-mini-tts`, a soft storyteller voice) when `OPENAI_API_KEY` is configured, falling back to the browser's own speech synthesis otherwise. Only the AI-generated story text is sent, same rule as image generation
 - A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
 
 ## The hardest problem

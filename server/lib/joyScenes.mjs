@@ -37,15 +37,16 @@ function isSafeSceneImageRequest(value) {
   return Boolean(normalizeElements(value.elements))
 }
 
-function elementPrompt(description, sprite, hasCastDoorway) {
-  const base = `${description}. A single isolated subject, centered, on a fully transparent background. Clear readable silhouette with strong contrast, soft outer glow optional. No ground, no cast shadow, no background scenery, no border.`
+function elementPrompt(description, sprite) {
+  const base = `${description}. A single isolated object, centered, alone on a fully transparent background: transparent pixels everywhere outside the object's own silhouette, with zero painted sky, clouds, stars, gradient, or any other scenery of any kind behind it. Clear readable silhouette with strong contrast, soft outer glow optional. No ground, no cast shadow, no border. No human or humanoid figures, faces, silhouettes, or characters of any kind — depict only the described object or creature itself.`
   if (sprite === 'garden-door') {
     return `${base} This may be exactly one whimsical doorway or arch — never a cluster of doors.`
   }
-  if (hasCastDoorway || sprite) {
-    return `${base} This subject is NOT a door, doorway, arch, gate, portal, or keyhole. Do not paint architectural openings.`
-  }
-  return `${base} Avoid doors, arches, gates, and portals unless the description unmistakably requires one.`
+  // Only the sprite explicitly cast as the world's one doorway may ever be
+  // painted as a door: every other element (including the hidden wonder,
+  // which has no sprite of its own) is described as a door-like shape only
+  // in words sometimes, never as literal architecture in the image itself.
+  return `${base} This subject is NOT a door, doorway, arch, gate, portal, or keyhole, even if its description sounds like one. Do not paint architectural openings.`
 }
 
 // Generates the world's visuals from the story itself: transparent sprites
@@ -72,7 +73,6 @@ export async function handleJoySceneRequest(requestBody) {
 
   const { look, backdrop } = requestBody
   const elements = normalizeElements(requestBody.elements)
-  const hasCastDoorway = elements.some((element) => element.sprite === 'garden-door')
   const imageModel = useOpenRouterImages
     ? process.env.OPENROUTER_IMAGE_MODEL || 'openai/gpt-image-1-mini'
     : process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
@@ -138,11 +138,12 @@ export async function handleJoySceneRequest(requestBody) {
   }
 
   try {
-    // Cap generated sprites to keep each world fast and inexpensive.
+    // Cap generated sprites to keep each world fast and inexpensive. The
+    // world's one permitted doorway (if any) lives only in its own cast
+    // element sprite — the backdrop itself never paints one, regardless of
+    // whether a doorway element exists elsewhere, to avoid ever doubling up.
     const cappedElements = elements.slice(0, 4)
-    const backdropRule = hasCastDoorway
-      ? 'Landscape and atmosphere only — no doorway, arch, gate, portal, or keyhole anywhere in the backdrop.'
-      : 'At most one distant architectural opening in the whole world; prefer pure landscape with no doors.'
+    const backdropRule = 'Landscape and atmosphere only — no doorway, arch, gate, portal, or keyhole anywhere in the backdrop, and no human or humanoid figures. Any doorway in this world lives only in its own separate cast element, never painted into the backdrop.'
     const [backdropImage, ...elementImages] = await Promise.all([
       backdrop
         ? generateOne(
@@ -152,7 +153,7 @@ export async function handleJoySceneRequest(requestBody) {
         : Promise.resolve(null),
       ...cappedElements.map((element) =>
         generateOne(
-          `${elementPrompt(element.description, element.sprite, hasCastDoorway)} ${imageConstraints} LOOK: ${look}`,
+          `${elementPrompt(element.description, element.sprite)} ${imageConstraints} LOOK: ${look}`,
           { size: '1024x1024', transparent: true },
         ),
       ),

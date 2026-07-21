@@ -1123,7 +1123,7 @@ function TravelerFlipCard({
       onClick={() => setFlipped((current) => !current)}
       aria-pressed={flipped}
       aria-label={flipped ? `${label}: show signature` : `${label}: show three worlds`}
-      className="group relative h-[19.5rem] w-full [perspective:1100px] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/50"
+      className="group relative h-[23rem] w-full [perspective:1100px] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/50"
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
@@ -1154,10 +1154,14 @@ function TravelerFlipCard({
         {/* Worlds side. */}
         <div className="absolute inset-0 flex rotate-y-180 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label} · 3 WORLDS</p>
-          <ol className="mt-2 grid min-h-0 flex-1 gap-2 overflow-y-auto">
+          <ol className="mt-2 grid flex-1 gap-2.5">
             {worlds.slice(0, 3).map((world, index) => {
               const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
               const mark = spriteMarks[world.sprite ?? ''] ?? '✦'
+              // A JS-truncated quote (rather than CSS line-clamp) guarantees a
+              // fixed, predictable height inside this 3D-transformed flip
+              // card regardless of how the browser handles line-clamp there.
+              const quoteText = world.quote.length > 66 ? `${world.quote.slice(0, 63).trimEnd()}…` : world.quote
               return (
                 <li key={`${world.worldName}-${index}`} className="flex items-center gap-2">
                   <div className="relative size-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
@@ -1171,7 +1175,7 @@ function TravelerFlipCard({
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-serif text-[11px] font-black leading-tight text-white">{world.worldName}</p>
-                    <p className="mt-0.5 line-clamp-2 text-[9px] leading-snug text-white/45">“{world.quote}”</p>
+                    <p className="mt-0.5 truncate text-[9px] leading-snug text-white/45">“{quoteText}”</p>
                   </div>
                 </li>
               )
