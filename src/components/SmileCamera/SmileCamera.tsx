@@ -29,6 +29,10 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
   const [portalOpen, setPortalOpen] = useState(false)
   const [celebrationComplete, setCelebrationComplete] = useState(false)
   const [entering, setEntering] = useState(false)
+  // Lets the traveler temporarily switch the camera off inside the portal
+  // (mobile heat + a clear privacy control). Stopping the track turns the
+  // camera light off and gates the MediaPipe inference loop below.
+  const [cameraPaused, setCameraPaused] = useState(false)
   const smileScoreRef = useRef(0)
   const enterHoldRef = useRef<number | null>(null)
   const enterReleaseRef = useRef(false)
@@ -57,7 +61,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     })
   }, [])
   const { error: smileError, smileScore, status: smileStatus, wowScore } = useSmileDetection({
-    enabled: cameraState === 'preview',
+    enabled: cameraState === 'preview' && !cameraPaused,
     videoRef,
     onSmileDetected: handleSmileDetected,
     onSmileMomentChange: handleSmileMomentChange,
@@ -72,6 +76,36 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
       videoRef.current.srcObject = null
     }
   }
+
+  // Portal-only, mobile-only pause: stop the camera track (light off, hardware
+  // idle) and let the detection loop unmount via `enabled` above; resume by
+  // re-acquiring the front camera. Frames still never leave the browser.
+  const toggleCameraPause = useCallback(async () => {
+    if (cameraPaused) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false,
+        })
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          void videoRef.current.play().catch(() => undefined)
+        }
+        setCameraPaused(false)
+      } catch {
+        // Re-acquiring failed (permission/hardware) — stay paused; the
+        // traveler can tap again to retry, and tapping still works everywhere.
+      }
+      return
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setCameraPaused(true)
+  }, [cameraPaused])
 
   const openPortal = () => {
     if (!smileUnlocked || !joySignature) return
@@ -91,6 +125,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
     setPortalOpen(false)
     setEntering(false)
     stopCamera()
+    setCameraPaused(false)
     setSmileUnlocked(false)
     setJoySignature(null)
     setCelebrationComplete(false)
@@ -105,6 +140,7 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
 
     const requestVersion = ++requestVersionRef.current
     stopCamera()
+    setCameraPaused(false)
     setSmileUnlocked(false)
     setJoySignature(null)
     setPortalOpen(false)
@@ -454,6 +490,8 @@ export function SmileCamera({ onBack }: SmileCameraProps) {
             smileStatus={smileStatus}
             wowScore={wowScore}
             onClose={returnToSmile}
+            cameraPaused={cameraPaused}
+            onToggleCamera={toggleCameraPause}
           />
         )}
       </AnimatePresence>

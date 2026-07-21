@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { ArrowLeft, ArrowRight, HeartHandshake, Loader2, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, CameraOff, HeartHandshake, Loader2, RefreshCw, Share2, Speech, Sparkles, Volume2, VolumeX, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { bloomLabel, type JoySignature } from '../SmileCamera/createJoySignature'
 import type { SmileDetectionStatus } from '../SmileCamera/useSmileDetection'
@@ -13,7 +13,7 @@ import { resolveScene } from '../../data/joyScene'
 import { saveVoyage } from '../../data/joyJournal'
 import { shareJoyStoryCard } from '../../data/joyStoryCard'
 import { generateSceneImages, generateSurpriseImage, type WorldSceneImages } from '../../data/joySceneImages'
-import { playConnectionChime, playDiscoveryChime, playHiddenWonderSound, setJoySoundsEnabled, startWorldSoundscape, stopJoySounds, stopWorldSoundscape } from '../../data/joySounds'
+import { playConnectionChime, playDiscoveryChime, playHiddenWonderSound, resumeJoySounds, setJoySoundsEnabled, startWorldSoundscape, stopJoySounds, stopWorldSoundscape } from '../../data/joySounds'
 import { speakJoyWorld, stopJoyVoice, warmJoyVoices } from '../../data/joyVoice'
 import { WorldSecret, WorldStage } from './WorldStage'
 import { JoyPrint } from '../JoyPrint'
@@ -24,6 +24,8 @@ type PortalRevealProps = {
   smileScore: number
   smileStatus: SmileDetectionStatus
   wowScore: number
+  cameraPaused?: boolean
+  onToggleCamera?: () => void
 }
 
 type CapsuleStatus =
@@ -39,7 +41,7 @@ type CapsuleStatus =
 
 type PortalPhase = 'story' | 'world'
 
-export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowScore }: PortalRevealProps) {
+export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowScore, cameraPaused = false, onToggleCamera }: PortalRevealProps) {
   const reduceMotion = useReducedMotion()
   const [capsules, setCapsules] = useState<JoyCapsule[]>([])
   const [activeCapsuleIndex, setActiveCapsuleIndex] = useState(0)
@@ -302,6 +304,17 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
     warmJoyVoices()
   }, [])
 
+  // Mobile keeps the Web Audio soundscape suspended until a user gesture (so
+  // the world can be silent on entry even though sound reads "On"), and iOS
+  // can re-suspend it after the reading's audio element stops. Resuming on
+  // any tap makes the already-running soundscape audible on first touch and
+  // brings it back after a reading ends.
+  useEffect(() => {
+    const resume = () => resumeJoySounds()
+    window.addEventListener('pointerdown', resume)
+    return () => window.removeEventListener('pointerdown', resume)
+  }, [])
+
   useEffect(() => {
     // Re-assert the module-level sound flag here: React StrictMode's dev
     // double-mount runs the unmount cleanup (stopJoySounds) once on open,
@@ -322,6 +335,10 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
     stopJoyVoice()
     setIsReading(false)
     setIsLoadingVoice(false)
+    // Stopping the reading's audio element can silence the Web Audio world
+    // soundscape on mobile (shared audio session). This runs from a tap, so
+    // re-assert the soundscape to bring world sound back when sound is on.
+    if (chimesOn && activeCapsule) startWorldSoundscape(activeCapsule.soundMood)
   }
 
   const readCapsuleAloud = (capsule: JoyCapsule) => {
@@ -650,35 +667,64 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         )}
       </div>
 
-      {/* Compact smile meter on phones; full status card on desktop. */}
-      <div
-        className="absolute bottom-3 left-3 z-20 flex w-[min(11.5rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/75 px-3 py-2 backdrop-blur sm:hidden"
-        role="status"
-        aria-label={
-          smileStatus === 'no-face'
-            ? 'Step into view — this world dims without you'
-            : smileStatus === 'unavailable' || smileStatus === 'idle'
-              ? 'Smile signal resting — tapping works too'
-              : 'Your smile is lighting this world'
-        }
-      >
-        <motion.span
-          animate={reduceMotion ? undefined : { opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-          className="size-2 shrink-0 rounded-full bg-amber-200"
-          style={{ boxShadow: `0 0 ${6 + smileScore * 14}px ${2 + smileScore * 5}px rgba(255,227,151,${0.25 + smileScore * 0.5})` }}
-          aria-hidden="true"
-        />
-        <span className="shrink-0 text-[10px] font-semibold text-white/85">Your smile</span>
-        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
-            style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
-          />
+      {/* Compact smile meter on phones; full status card on desktop. The
+          camera toggle sits beside it and is mobile-only (heat + privacy). */}
+      <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 sm:hidden">
+        <div
+          className="flex w-[min(10.5rem,calc(100vw-5rem))] items-center gap-2 rounded-full border border-white/15 bg-[#160a31]/75 px-3 py-2 backdrop-blur"
+          role="status"
+          aria-label={
+            cameraPaused
+              ? 'Camera is off'
+              : smileStatus === 'no-face'
+                ? 'Step into view — this world dims without you'
+                : smileStatus === 'unavailable' || smileStatus === 'idle'
+                  ? 'Smile signal resting — tapping works too'
+                  : 'Your smile is lighting this world'
+          }
+        >
+          {cameraPaused ? (
+            <>
+              <CameraOff className="size-3.5 shrink-0 text-rose-100/80" aria-hidden="true" />
+              <span className="text-[10px] font-semibold text-white/85">Camera off</span>
+            </>
+          ) : (
+            <>
+              <motion.span
+                animate={reduceMotion ? undefined : { opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                className="size-2 shrink-0 rounded-full bg-amber-200"
+                style={{ boxShadow: `0 0 ${6 + smileScore * 14}px ${2 + smileScore * 5}px rgba(255,227,151,${0.25 + smileScore * 0.5})` }}
+                aria-hidden="true"
+              />
+              <span className="shrink-0 text-[10px] font-semibold text-white/85">Your smile</span>
+              <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200 transition-[width] duration-150"
+                  style={{ width: `${Math.round(Math.min(smileScore, 1) * 100)}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.06em] text-amber-100/90">
+                {Math.round(Math.min(smileScore, 1) * 100)}%
+              </span>
+            </>
+          )}
         </div>
-        <span className="shrink-0 text-[10px] font-black tabular-nums tracking-[0.06em] text-amber-100/90">
-          {Math.round(Math.min(smileScore, 1) * 100)}%
-        </span>
+        {onToggleCamera && (
+          <button
+            type="button"
+            onClick={onToggleCamera}
+            aria-pressed={cameraPaused}
+            aria-label={cameraPaused ? 'Turn the camera back on' : 'Turn the camera off for privacy'}
+            className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full border backdrop-blur transition active:scale-90 focus:outline-none focus:ring-2 focus:ring-white/40 ${
+              cameraPaused
+                ? 'border-rose-200/55 bg-rose-200/20 text-rose-50'
+                : 'border-white/15 bg-[#160a31]/75 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            {cameraPaused ? <CameraOff className="size-4" aria-hidden="true" /> : <Camera className="size-4" aria-hidden="true" />}
+          </button>
+        )}
       </div>
 
       <div className="absolute bottom-5 left-5 z-20 hidden max-w-[15rem] items-start gap-3 rounded-2xl border border-white/15 bg-[#160a31]/65 px-4 py-3 backdrop-blur sm:flex">

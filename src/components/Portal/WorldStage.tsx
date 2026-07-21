@@ -102,7 +102,18 @@ function wonderPocket(seed: number) {
 }
 
 function motionProps(element: WorldSceneElement, index: number, reduceMotion: boolean) {
-  if (reduceMotion || element.motion === 'still') return {}
+  if (reduceMotion) return {}
+  // Waves always swell sideways, and far more than anything else — a large,
+  // quick horizontal sway reads as an obvious rolling ocean current rather
+  // than the gentle drift the other elements get.
+  if (element.sprite === 'wave') {
+    const waveDrift = 50 + (index % 3) * 14
+    return {
+      animate: { x: [0, waveDrift, 0, -waveDrift, 0] },
+      transition: { duration: 6.5 + (index % 3) * 1, repeat: Infinity, ease: 'easeInOut' as const },
+    }
+  }
+  if (element.motion === 'still') return {}
   const drift = 18 + (index % 3) * 9
   switch (element.motion) {
     case 'drift':

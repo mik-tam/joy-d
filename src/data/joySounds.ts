@@ -22,6 +22,19 @@ export function stopWorldSoundscape() {
   worldSoundCleanup = null
 }
 
+// Mobile browsers keep a freshly created AudioContext suspended until a user
+// gesture, and iOS can re-suspend the shared audio session after an
+// HTMLAudioElement (the world reading) plays and stops. Resuming from within
+// a real tap makes the already-running soundscape oscillators audible again.
+// Cheap and idempotent — a no-op when the context is already running.
+export function resumeJoySounds() {
+  if (!soundEnabled) return
+  const context = getAudioContext()
+  if (context && context.state === 'suspended') {
+    void context.resume().catch(() => undefined)
+  }
+}
+
 function soundProfile(soundMood: string) {
   const mood = soundMood.toLowerCase()
   if (/sea|wave|tide|water|harbour|ocean/.test(mood)) {
