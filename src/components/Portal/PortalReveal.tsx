@@ -207,16 +207,17 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, activeCapsule, storyOpen, revealedWorlds])
 
-  // Stop any in-progress reading the moment the traveler moves to a
-  // different world (go deeper, or tap a discovery dot) — otherwise the
-  // previous world's narration keeps playing over the new one.
+  // Stop any in-progress reading the moment the traveler leaves the current
+  // world — going deeper, tapping a discovery dot, or opening the Joy Story
+  // wrap (storyOpen) from the third world — so the old narration never keeps
+  // playing over the next screen.
   useEffect(() => {
     return () => {
       stopJoyVoice()
       setIsReading(false)
       setIsLoadingVoice(false)
     }
-  }, [activeWorldName])
+  }, [activeWorldName, storyOpen])
 
   // Entering a world for the first time begins in the story void; revisits
   // step straight back into the finished world.
@@ -392,7 +393,13 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
       </AnimatePresence>
 
       <AnimatePresence>
-        {phase === 'story' && capsuleStatus === 'loading' && !reduceMotion && (
+        {/* The wormhole plays for every gate, not just the first. Door 1's
+            story phase is `loading`; doors 2 and 3 are already `ready` by the
+            time their story phase opens (goDeeper awaits the capsule before
+            switching worlds), so gating on `loading` alone left later gates
+            with no warp. Show it through the whole story phase for any
+            non-error state — we're travelling between worlds each time. */}
+        {phase === 'story' && (capsuleStatus === 'loading' || capsuleStatus === 'ready') && !reduceMotion && (
           <motion.div key="warp" exit={{ opacity: 0, transition: { duration: 0.9 } }}>
             <WarpField />
           </motion.div>
@@ -1227,7 +1234,7 @@ function TravelerFlipCard({
       onClick={() => setFlipped((current) => !current)}
       aria-pressed={flipped}
       aria-label={flipped ? `${label}: show signature` : `${label}: show three worlds`}
-      className="group relative h-[23rem] w-full [perspective:1100px] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/50"
+      className="group relative h-[20rem] w-full [perspective:1100px] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-100/50"
     >
       <motion.div
         animate={{ rotateY: flipped ? 180 : 0 }}
@@ -1699,7 +1706,6 @@ function SmileStory({
                     <RefreshCw className="size-4" aria-hidden="true" />
                     Begin a new journey
                   </button>
-                  <p className="mt-2 text-xs text-white/40">Every journey starts with a new smile.</p>
                 </div>
               ) : matchStatus === 'searching' ? (
                 <div className="flex flex-col items-center">
@@ -1769,7 +1775,7 @@ function SmileStory({
                   <button
                     type="button"
                     onClick={() => void findConnection()}
-                    className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-white/50 underline-offset-4 transition hover:text-white/80 hover:underline focus:outline-none"
+                    className="mt-4 inline-flex items-center gap-2 text-[10px] font-medium text-white/35 underline-offset-4 transition hover:text-white/70 hover:underline focus:outline-none"
                   >
                     or tap to find another
                   </button>

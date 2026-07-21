@@ -288,7 +288,9 @@ export function WorldSecret({
   const pocket = wonderPocket(seed)
   const left = pocket.left
   const top = pocket.top
-  const hiddenLabel = capsule.surprise.length > 82 ? `${capsule.surprise.slice(0, 79)}…` : capsule.surprise
+  // Show the whole hidden wonder — it's a short single-object description, so
+  // let the toast wrap to fit rather than clipping it mid-word.
+  const hiddenLabel = capsule.surprise
   const transformed = hiddenRevealed && Boolean(revealedImage)
 
   // The found-message drifts away on its own so it never blocks the journey.
