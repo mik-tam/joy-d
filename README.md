@@ -79,22 +79,31 @@ No separate sample-data download is required. The repository includes the browse
 npm install
 ```
 
-### 2. Configure an AI provider
+### 2. Configure AI providers
 
-Copy `.env.example` to `.env`, then add **one** provider key. OpenRouter takes priority when both are present.
+Copy `.env.example` to `.env`. Default is OpenRouter-only (no OpenAI API balance needed):
+
+- **Stories** → OpenRouter chat (`JOYD_TEXT_PROVIDER=openrouter`)
+- **World images** → OpenRouter image model (`JOYD_IMAGE_PROVIDER=openrouter`)
+
+Stories default to OpenRouter's free tier (`openrouter/free`) so no credits burn on every capsule. Free tier can be slow, so if `OPENAI_API_KEY` is also set, a slow free-tier response automatically falls back to direct OpenAI for that one request instead of making a traveler wait. Avoid `openai/gpt-*` chat models on OpenRouter itself: they often return provider ToS `403` even when your credits are fine. Image models like `openai/gpt-image-1-mini` are separate and usually work.
 
 ```bash
-OPENROUTER_API_KEY=your_key_here
-OPENROUTER_MODEL=google/gemini-2.5-flash
+OPENROUTER_API_KEY=your_openrouter_key
+OPENROUTER_MODEL=openrouter/free
+OPENROUTER_IMAGE_MODEL=openai/gpt-image-1-mini
 OPENROUTER_SITE_URL=http://localhost:5173
-```
+JOYD_TEXT_PROVIDER=openrouter
+JOYD_IMAGE_PROVIDER=openrouter
+JOYD_WORLD_IMAGES=on
 
-Or use OpenAI:
-
-```bash
-OPENAI_API_KEY=your_key_here
+# Optional: only spent when the free tier is slow, or when
+# JOYD_TEXT_PROVIDER=openai is set explicitly.
+OPENAI_API_KEY=your_openai_key
 OPENAI_MODEL=gpt-5.6
 ```
+
+If only OpenAI is configured, JOY:D can still use it. When both keys exist and providers are unset, OpenRouter wins for stories, with OpenAI as the automatic slow-response fallback described above.
 
 Never commit `.env`.
 
@@ -122,9 +131,10 @@ No camera frames, face landmarks, or raw smile measurements are sent to the serv
 ### Option A: Vercel
 
 1. Import the repo in Vercel. The **Vite** framework preset is fine. Vercel auto-detects the `api/` folder and turns it into serverless functions regardless of preset.
-2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`), `OPENROUTER_IMAGE_MODEL` (default `openai/gpt-image-1-mini`), `OPENROUTER_SITE_URL` (your deployed URL, used as the OpenRouter referer header), `JOYD_WORLD_IMAGES=on`. Or use `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_IMAGE_MODEL` instead if you'd rather run on OpenAI directly (`JOYD_TEXT_PROVIDER` / `JOYD_IMAGE_PROVIDER` can pin one or the other independently).
-3. For real anonymous matching, run the Supabase migration and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
-4. Deploy. No `vercel.json` is needed.
+2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL=openrouter/free` (avoid `openai/gpt-*` for chat, those often return ToS 403), `OPENROUTER_IMAGE_MODEL=openai/gpt-image-1-mini`, `OPENROUTER_SITE_URL` (your deployed URL, e.g. `https://joy-d-one.vercel.app`), `JOYD_TEXT_PROVIDER=openrouter`, `JOYD_IMAGE_PROVIDER=openrouter`, `JOYD_WORLD_IMAGES=on`. If an old `OPENROUTER_MODEL=openai/...` value is still set on Vercel, change or delete it and redeploy.
+3. Optionally also set `OPENAI_API_KEY` and `OPENAI_MODEL=gpt-5.6`: a slow free-tier response then falls back to direct OpenAI for that request instead of leaving the traveler waiting, without spending OpenAI credit on every capsule.
+4. For real anonymous matching, run the Supabase migration and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+5. Deploy. No `vercel.json` is needed.
 
 `api/joy-capsules.js` and `api/joy-scenes.js` set `maxDuration` (90s / 120s) to cover the slower story and image generation calls. Raise these in the function file if you change the provider timeouts in `server/lib/*.mjs`.
 

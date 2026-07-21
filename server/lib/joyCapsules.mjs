@@ -302,15 +302,52 @@ export async function handleJoyCapsuleRequest(requestBody) {
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
 
-  // JOYD_TEXT_PROVIDER=openai|openrouter pins the story provider; by default
-  // OpenRouter wins when its key exists.
-  const pinnedTextProvider = process.env.JOYD_TEXT_PROVIDER
-  const useOpenRouter = pinnedTextProvider === 'openai'
-    ? false
-    : pinnedTextProvider === 'openrouter' || Boolean(process.env.OPENROUTER_API_KEY)
-  if (useOpenRouter ? !process.env.OPENROUTER_API_KEY : !process.env.OPENAI_API_KEY) {
+  // Default to OpenRouter whenever its key exists (hackathon credits). Pin with
+  // JOYD_TEXT_PROVIDER=openai only if you intentionally want direct OpenAI.
+  // Images stay independently routed in joyScenes.mjs.
+  const pinnedTextProvider = process.env.JOYD_TEXT_PROVIDER?.trim().toLowerCase()
+  const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim())
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY?.trim())
+  const useOpenRouter =
+    pinnedTextProvider === 'openai'
+      ? false
+      : pinnedTextProvider === 'openrouter'
+        ? hasOpenRouter
+        : hasOpenRouter || !hasOpenAI
+  if (useOpenRouter ? !hasOpenRouter : !hasOpenAI) {
     return { status: 503, body: { code: 'AI_NOT_CONFIGURED' } }
   }
+
+  // OpenAI chat models via OpenRouter frequently return provider ToS 403s even
+  // when image credits work. Keep OpenRouter for stories, but avoid openai/*.
+  const openRouterFreeModel = 'openrouter/free'
+  const openRouterChatFallbacks = [
+    'google/gemini-2.5-flash',
+    'anthropic/claude-sonnet-4',
+    'deepseek/deepseek-chat-v3-0324',
+  ]
+  // Free tier is the default (no OpenRouter credits burned for stories); it's
+  // also the slowest and least consistent option, so a short timeout on it
+  // specifically hands off to direct OpenAI rather than making a traveler wait.
+  const resolveOpenRouterChatModels = () => {
+    const requested = process.env.OPENROUTER_MODEL?.trim()
+    const primary =
+      !requested || requested.startsWith('openai/')
+        ? openRouterFreeModel
+        : requested
+    if (requested?.startsWith('openai/')) {
+      console.warn(
+        `JOY:D skipping OpenRouter chat model "${requested}" (OpenAI chat via OpenRouter often returns ToS 403). Using ${primary}.`,
+      )
+    }
+    return [...new Set([primary, ...openRouterChatFallbacks])]
+  }
+
+  const STANDARD_TIMEOUT_MS = 45_000
+  const FREE_TIER_TIMEOUT_MS = 20_000
+
+  let activeOpenRouterModel = useOpenRouter ? resolveOpenRouterChatModels()[0] : undefined
+  let servedByOpenAIFallback = false
 
   try {
     const worldDepth = previousWorldNames.length
@@ -331,75 +368,119 @@ export async function handleJoyCapsuleRequest(requestBody) {
       ? ` It must feel distinctly new and must not reuse these earlier world names: ${JSON.stringify(previousWorldNames)}.`
       : ''
     const userPrompt = `Create one fresh joy capsule using this creative signature: ${JSON.stringify(signature)}. ${depthBrief}${previousWorldInstruction}`
-    const client = new OpenAI(
-      useOpenRouter
-        ? {
-            apiKey: process.env.OPENROUTER_API_KEY,
-            baseURL: 'https://openrouter.ai/api/v1',
-            defaultHeaders: {
-              'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:5173',
-              'X-OpenRouter-Title': 'JOY:D',
-            },
-          }
-        : { apiKey: process.env.OPENAI_API_KEY },
-    )
-    const requestCompletion = async () => {
+    const openRouterClient = useOpenRouter
+      ? new OpenAI({
+          apiKey: process.env.OPENROUTER_API_KEY,
+          baseURL: 'https://openrouter.ai/api/v1',
+          defaultHeaders: {
+            'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'https://joy-d-one.vercel.app',
+            'X-OpenRouter-Title': 'JOY:D',
+          },
+        })
+      : undefined
+    // OpenAI is either the pinned provider, or the fallback when free-tier
+    // OpenRouter is too slow — built lazily so we don't require the key
+    // unless one of those two cases actually needs it.
+    let openAIClient
+    const getOpenAIClient = () => {
+      if (!openAIClient) openAIClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      return openAIClient
+    }
+
+    const openRouterModels = useOpenRouter ? resolveOpenRouterChatModels() : []
+    activeOpenRouterModel = openRouterModels[0]
+
+    const requestViaOpenRouter = async (model, timeoutMs) => {
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 45_000)
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
       try {
-        return useOpenRouter
-          ? await client.chat.completions.create({
-              model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-              ],
-              response_format: {
-                type: 'json_schema',
-                json_schema: {
-                  name: 'joy_capsule',
-                  strict: true,
-                  schema: capsuleSchema,
-                },
-              },
-              // Gemini Flash otherwise burns the output budget on hidden
-              // "thinking" tokens and can return empty structured JSON.
-              reasoning: { effort: 'none' },
-            }, { signal: controller.signal })
-          : await client.responses.create({
-              model: process.env.OPENAI_MODEL || 'gpt-5.6',
-              store: false,
-              input: [
-                { role: 'developer', content: [{ type: 'input_text', text: systemPrompt }] },
-                { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
-              ],
-              text: {
-                format: {
-                  type: 'json_schema',
-                  name: 'joy_capsule',
-                  strict: true,
-                  schema: capsuleSchema,
-                },
-              },
-            }, { signal: controller.signal })
+        activeOpenRouterModel = model
+        return await openRouterClient.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'joy_capsule',
+              strict: true,
+              schema: capsuleSchema,
+            },
+          },
+          // Gemini Flash otherwise burns the output budget on hidden
+          // "thinking" tokens and can return empty structured JSON.
+          reasoning: { effort: 'none' },
+        }, { signal: controller.signal })
       } finally {
         clearTimeout(timeout)
       }
     }
 
-    // One quiet retry smooths over slow or congested models (especially the
-    // free tier); auth, quota, and validation errors fail immediately.
+    const requestViaOpenAI = async (timeoutMs) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        return await getOpenAIClient().responses.create({
+          model: process.env.OPENAI_MODEL || 'gpt-5.6',
+          store: false,
+          input: [
+            { role: 'developer', content: [{ type: 'input_text', text: systemPrompt }] },
+            { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'joy_capsule',
+              strict: true,
+              schema: capsuleSchema,
+            },
+          },
+        }, { signal: controller.signal })
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
+    const requestCompletion = (modelOverride) => {
+      if (!useOpenRouter) return requestViaOpenAI(STANDARD_TIMEOUT_MS)
+      const model = modelOverride || activeOpenRouterModel
+      const timeoutMs = model === openRouterFreeModel ? FREE_TIER_TIMEOUT_MS : STANDARD_TIMEOUT_MS
+      return requestViaOpenRouter(model, timeoutMs)
+    }
+
+    // One quiet retry for congested models; ToS/404 on OpenRouter tries the
+    // next model; a slow free-tier response hands off to direct OpenAI
+    // (if configured) instead of waiting out the full timeout on retry.
     let completion
     try {
       completion = await requestCompletion()
     } catch (error) {
       const status = typeof error?.status === 'number' ? error.status : undefined
+      const message = error instanceof Error ? error.message : ''
+      const providerBlocked = status === 403 && /terms of service|prohibited/i.test(message)
       const retryable = error?.name === 'AbortError' || status === undefined || status >= 500 || status === 429
-      if (!retryable) throw error
-      completion = await requestCompletion()
+      if (useOpenRouter && error?.name === 'AbortError' && activeOpenRouterModel === openRouterFreeModel && hasOpenAI) {
+        console.warn('JOY:D OpenRouter free tier timed out; falling back to direct OpenAI for this request.')
+        servedByOpenAIFallback = true
+        completion = await requestViaOpenAI(STANDARD_TIMEOUT_MS)
+      } else if (useOpenRouter && (providerBlocked || status === 404)) {
+        const nextModel = openRouterModels.find((model) => model !== activeOpenRouterModel)
+        if (nextModel) {
+          console.warn(`JOY:D OpenRouter model "${activeOpenRouterModel}" failed (${status}); trying ${nextModel}`)
+          completion = await requestCompletion(nextModel)
+        } else {
+          throw error
+        }
+      } else if (!retryable) {
+        throw error
+      } else {
+        completion = await requestCompletion()
+      }
     }
 
-    const outputText = useOpenRouter
+    const outputText = useOpenRouter && !servedByOpenAIFallback
       ? completion.choices[0]?.message.content
       : completion.output_text
     let capsule
@@ -450,6 +531,10 @@ export async function handleJoyCapsuleRequest(requestBody) {
       code: error?.code,
       message,
       name: error?.name,
+      provider: useOpenRouter && !servedByOpenAIFallback ? 'openrouter' : 'openai',
+      model: useOpenRouter && !servedByOpenAIFallback
+        ? activeOpenRouterModel || process.env.OPENROUTER_MODEL || 'openrouter/free'
+        : (process.env.OPENAI_MODEL || 'gpt-5.6'),
       status,
       type: error?.type,
     })
