@@ -174,11 +174,24 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
   useEffect(() => {
     if (phase !== 'world' || !activeCapsule || storyOpen) return
     if (revealedWorlds.has(activeCapsule.worldName)) return
+    // Fresh start for every world: never carry a partial (or stale) hold
+    // timestamp over from a previous world. Without this reset, the first
+    // tick here would read `now - <old timestamp>` as a long-completed hold
+    // and reveal the wonder instantly on arrival.
+    wowHoldRef.current = null
+    setWowCharge(0)
+    // Ignore whatever expression the traveler happens to land with — they
+    // were just reading the story — so only a WOW made deliberately after
+    // settling into the world counts. This is the main cause of the
+    // "auto-reveals the moment I arrive" behavior.
+    const watchStartedAt = performance.now()
+    const graceMs = 900
     const tick = setInterval(() => {
+      if (performance.now() - watchStartedAt < graceMs) return
       const wow = wowScoreRef.current
       if (wow >= 0.42) {
         wowHoldRef.current ??= performance.now()
-        const progress = Math.min((performance.now() - wowHoldRef.current) / 450, 1)
+        const progress = Math.min((performance.now() - wowHoldRef.current) / 550, 1)
         setWowCharge(progress)
         if (progress >= 1) {
           wowHoldRef.current = null
@@ -193,6 +206,17 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
     return () => clearInterval(tick)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, activeCapsule, storyOpen, revealedWorlds])
+
+  // Stop any in-progress reading the moment the traveler moves to a
+  // different world (go deeper, or tap a discovery dot) — otherwise the
+  // previous world's narration keeps playing over the new one.
+  useEffect(() => {
+    return () => {
+      stopJoyVoice()
+      setIsReading(false)
+      setIsLoadingVoice(false)
+    }
+  }, [activeWorldName])
 
   // Entering a world for the first time begins in the story void; revisits
   // step straight back into the finished world.
@@ -362,14 +386,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             className="pointer-events-none absolute inset-0 grid place-items-center"
             aria-hidden="true"
           >
-            {/* The ring's true size (27-30rem) overflows a phone viewport
-                width, and framer-motion's own scale animation above already
-                claims the transform on this element — so the responsive
-                shrink lives on this separate inner wrapper instead of
-                fighting for the same style property. */}
-            <div className="scale-[0.72] sm:scale-100">
-              <PortalRing smileScore={smileScore} />
-            </div>
+            <PortalRing smileScore={smileScore} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -1084,7 +1101,7 @@ function TrailComet({ colors, className, reverse }: { colors: string[]; classNam
   )
 }
 
-function StoryStat({ label, value, percent }: { label: string; value: string; percent: number }) {
+function StoryStat({ label, value, percent, stacked = false }: { label: string; value: string; percent: number; stacked?: boolean }) {
   const [displayPercent, setDisplayPercent] = useState(0)
   const displayPercentRef = useRef(0)
   const clampedPercent = Math.min(Math.max(percent, 4), 100)
@@ -1110,17 +1127,36 @@ function StoryStat({ label, value, percent }: { label: string; value: string; pe
 
   const rollingValue = value.endsWith('%') ? `${displayPercent}%` : value
 
+  const bar = (
+    <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${clampedPercent}%` }}
+        transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
+        className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
+      />
+    </div>
+  )
+
+  // Stacked layout for narrow columns (the finale flip cards): the label
+  // sits on its own line so the bar can run the full width beneath it,
+  // instead of being squeezed into a sliver by a side-by-side label+value.
+  if (stacked) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10px] font-bold tracking-[0.16em] text-amber-100/70">{label}</span>
+        <div className="flex items-center gap-2">
+          {bar}
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-white/85">{rollingValue}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-3">
       <span className="w-24 shrink-0 text-left text-[11px] font-bold tracking-[0.16em] text-amber-100/70">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${clampedPercent}%` }}
-          transition={{ duration: 1, ease: 'easeOut', delay: 0.3 }}
-          className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-rose-300 to-amber-200"
-        />
-      </div>
+      {bar}
       <span className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-white/85">{rollingValue}</span>
     </div>
   )
@@ -1199,43 +1235,35 @@ function TravelerFlipCard({
         className="relative h-full w-full [transform-style:preserve-3d]"
       >
         {/* Signature composition side (shown first). */}
-        <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
+        <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3.5 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden]">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label}</p>
             <p className="shrink-0 text-[10px] font-bold tracking-wider text-amber-100">{signature.momentCode}</p>
           </div>
-          <div className="mt-2 flex items-center gap-2.5">
+          <div className="mt-2 flex items-start gap-2.5">
             <JoyPrint signature={signature} className="size-11 shrink-0" />
             <div className="min-w-0">
-              <p className="truncate font-serif text-sm font-black leading-tight text-white">{signature.wonderTitle}</p>
-              <p className="text-[10px] text-white/55">{signature.shape}</p>
+              <p className="line-clamp-3 font-serif text-sm font-black leading-tight text-white">{signature.wonderTitle}</p>
+              <p className="mt-0.5 text-[10px] text-white/55">{signature.shape}</p>
             </div>
           </div>
-          <div className="mt-3 grid flex-1 gap-1.5">
-            <StoryStat label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
-            <StoryStat label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 4000) * 100} />
-            <StoryStat label="BLOOM" value={bloomLabel(signature.riseRate)} percent={(signature.riseRate / 1) * 100} />
+          <div className="mt-4 grid flex-1 content-start gap-3.5">
+            <StoryStat stacked label="BRIGHTNESS" value={`${signature.signalPercent}%`} percent={signature.signalPercent} />
+            <StoryStat stacked label="HOLD" value={`${(signature.heldForMs / 1000).toFixed(1)}s`} percent={(signature.heldForMs / 4000) * 100} />
+            <StoryStat stacked label="BLOOM" value={bloomLabel(signature.riseRate)} percent={(signature.riseRate / 1) * 100} />
           </div>
-          <p className="mt-2 text-center text-[9px] text-white/35">tap to see worlds</p>
         </div>
 
         {/* Worlds side. */}
-        <div className="absolute inset-0 flex rotate-y-180 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
+        <div className="absolute inset-0 flex rotate-y-180 flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#160a31]/80 p-3.5 text-left shadow-xl backdrop-blur-md [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <p className="text-[9px] font-bold tracking-[0.16em] text-amber-100/75">{label} · 3 WORLDS</p>
-          <ol className="mt-2 grid flex-1 gap-2.5">
+          <ol className="mt-2.5 grid flex-1 content-start gap-3">
             {worlds.slice(0, 3).map((world, index) => {
               const image = worldImages?.[world.worldName]?.elements.find(Boolean) ?? null
               const mark = spriteMarks[world.sprite ?? ''] ?? '✦'
-              // A JS-truncated quote sized for ~2 wrapped lines at this
-              // column width (rather than CSS line-clamp, which the flip
-              // card's 3D transform may not reliably constrain) plus a fixed
-              // max-height as a hard backstop — this shows far more of the
-              // quote than a single-line truncate while still guaranteeing a
-              // predictable height and no scrollbar.
-              const quoteText = world.quote.length > 82 ? `${world.quote.slice(0, 79).trimEnd()}…` : world.quote
               return (
-                <li key={`${world.worldName}-${index}`} className="flex items-center gap-2">
-                  <div className="relative size-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+                <li key={`${world.worldName}-${index}`} className="flex items-start gap-2.5">
+                  <div className="relative size-9 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5">
                     {image ? (
                       <img src={image} alt="" className="h-full w-full object-contain p-0.5" />
                     ) : (
@@ -1244,15 +1272,14 @@ function TravelerFlipCard({
                       </span>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-serif text-[11px] font-black leading-tight text-white">{world.worldName}</p>
-                    <p className="mt-0.5 max-h-[2.6em] overflow-hidden text-[9px] leading-snug text-white/45">“{quoteText}”</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 font-serif text-[11px] font-black leading-tight text-white">{world.worldName}</p>
+                    <p className="mt-1 line-clamp-4 text-[9px] leading-snug text-white/50">“{world.quote}”</p>
                   </div>
                 </li>
               )
             })}
           </ol>
-          <p className="mt-1 text-center text-[9px] text-white/35">tap to see signature</p>
         </div>
       </motion.div>
     </button>
