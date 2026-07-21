@@ -43,7 +43,7 @@ Key decisions accelerated with Codex and GPT-5.6:
 - OpenAI-compatible API calls through OpenRouter or OpenAI for Joy Capsule generation
 - AI scene casting: the model writes a vivid visual description for every element of its own story (a miniature boat, travelers stepping off clouds) plus a backdrop line, with escalating whimsy briefs per depth and a deterministic fallback scene when a model cannot hold the schema
 - Live world painting: each world's actual visuals are generated in real time — transparent watercolor sprites for every cast element plus a distant backdrop, style-locked to the capsule's LOOK direction. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or directly through OpenAI's `gpt-image-1` otherwise; `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit and the generated art blooms in as it arrives; without image credit the kit remains the complete experience
-- Express for a tiny local API server
+- Express for local dev/preview and any persistent-Node host; the same three route handlers also run as Vercel serverless functions for a Vercel deployment (see Deploy below)
 - Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
 - A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
 
@@ -103,16 +103,33 @@ Open the local address shown in the terminal. `npm run dev` starts both the Vite
 
 ## Deploy
 
-Build the client, then run the same Express server in production:
+The three `/api` routes (`joy-capsules`, `joy-scenes`, `smile-matches`) are implemented once as plain functions in `server/lib/*.mjs` and exposed on two different hosts, so behavior never drifts between them:
+
+- **`server/index.mjs`** — an Express app that serves `dist` and the `/api` routes from one long-running process. Use this for local dev/preview and for any host that runs a persistent Node process (Render, Railway, Fly.io, a VPS, etc).
+- **`api/*.js`** — the same routes as Vercel serverless functions, for deploying straight to Vercel.
+
+Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in your host's encrypted environment settings—never expose either key in a Vite `VITE_*` variable. Deploy over HTTPS: browsers require a secure context for camera access outside `localhost`.
+
+The matching pool lives in process memory only: ephemeral, capped, and cleared on restart. No camera frames, face landmarks, or raw smile measurements are sent to the server in any deployment.
+
+### Option A: Vercel
+
+1. Import the repo in Vercel. The **Vite** framework preset is fine — Vercel auto-detects the `api/` folder and turns it into serverless functions regardless of preset.
+2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `openrouter/free`), `OPENROUTER_IMAGE_MODEL` (default `openai/gpt-image-1-mini`), `OPENROUTER_SITE_URL` (your deployed URL, used as the OpenRouter referer header), `JOYD_WORLD_IMAGES=on`. Or use `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_IMAGE_MODEL` instead if you'd rather run on OpenAI directly (`JOYD_TEXT_PROVIDER` / `JOYD_IMAGE_PROVIDER` can pin one or the other independently).
+3. Deploy. No `vercel.json` is needed.
+
+`api/joy-capsules.js` and `api/joy-scenes.js` set `maxDuration` (90s / 120s) to cover the slower story and image generation calls—raise these in the function file if you change the provider timeouts in `server/lib/*.mjs`.
+
+**Known trade-off on Vercel:** the live matching pool (`server/lib/smileMatches.mjs`) is a plain in-memory array. On the Express host that's one persistent process, so it behaves exactly as documented. On Vercel, each function instance has its own memory and can be recycled between requests, so the pool is best-effort there — some matches will resolve against another *live* traveler if you hit a warm instance, but most will fall back to the seeded demo travelers, which is the same disclosed fallback UX either way (nothing breaks). If you want guaranteed cross-instance live matching on Vercel, swap the storage in that one file for a shared store (Vercel KV / Upstash Redis); the three exported functions' signatures wouldn't need to change.
+
+### Option B: a persistent Node host (Render / Railway / Fly.io / a VPS)
 
 ```bash
 npm run build
 npm start
 ```
 
-The server serves `dist` and the `/api` endpoints from one process. Set `OPENAI_API_KEY` or `OPENROUTER_API_KEY` in your host's encrypted environment settings—never expose either key in a Vite `VITE_*` variable. Hosts normally provide `PORT`; `npm start` binds to the host's network interface, while `npm run dev` stays loopback-only. Deploy over HTTPS: browsers require a secure context for camera access outside `localhost`.
-
-The matching pool remains in process memory only: it is ephemeral, capped, and cleared on restart. No camera frames, face landmarks, or raw smile measurements are sent to the server in any deployment.
+Hosts normally provide `PORT`; `npm start` binds to the host's network interface, while `npm run dev` stays loopback-only.
 
 ### Quick test
 
