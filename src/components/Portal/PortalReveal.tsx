@@ -873,19 +873,39 @@ function Typewriter({ text, skip, onDone }: { text: string; skip: boolean; onDon
 }
 
 function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: () => void }) {
+  const isLocalHost =
+    typeof window !== 'undefined'
+    && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)
+
   const message =
     status === 'missing-key' ? (
-      <>This world needs an AI provider key before it can bloom. Add an OpenAI or OpenRouter key to your local <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then open the portal again.</>
+      isLocalHost ? (
+        <>This world needs an AI provider key before it can bloom. Add an OpenAI or OpenRouter key to your local <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then open the portal again.</>
+      ) : (
+        <>This world needs an AI provider key before it can bloom. Add <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_API_KEY</code> or <code className="rounded bg-white/10 px-1.5 py-0.5">OPENAI_API_KEY</code> in the host’s environment settings, then redeploy.</>
+      )
     ) : status === 'quota-exhausted' ? (
       <>This OpenAI project has no available API quota. Add credits, raise the project budget, or use an OpenRouter key instead.</>
     ) : status === 'service-offline' ? (
-      <>The local JOY:D capsule service is not running. Stop the old dev server and restart this project with <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
+      isLocalHost ? (
+        <>The local JOY:D capsule service is not running. Stop the old dev server and restart this project with <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
+      ) : (
+        <>JOY:D could not reach its world-making service. Check the latest deploy and server logs, then try again.</>
+      )
     ) : status === 'auth-failed' ? (
-      <>JOY:D can reach the AI provider, but it cannot verify the key. Check the key in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then restart <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
+      isLocalHost ? (
+        <>JOY:D can reach the AI provider, but it cannot verify the key. Check the key in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, then restart <code className="rounded bg-white/10 px-1.5 py-0.5">npm run dev</code>.</>
+      ) : (
+        <>JOY:D can reach the AI provider, but it cannot verify the key. In Vercel → Project → Settings → Environment Variables, confirm <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_API_KEY</code> (and <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code>) for Production, then redeploy.</>
+      )
     ) : status === 'rate-limited' ? (
       <>The world-maker is busy right now. Wait a moment, then try gathering this world again.</>
     ) : status === 'model-unavailable' ? (
-      <>This model is not available right now. Check <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, restart, and try again.</>
+      isLocalHost ? (
+        <>This model is not available right now. Check <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> in <code className="rounded bg-white/10 px-1.5 py-0.5">.env</code>, restart, and try again.</>
+      ) : (
+        <>This model is not available right now. Set <code className="rounded bg-white/10 px-1.5 py-0.5">OPENROUTER_MODEL</code> to a model your OpenRouter account can use (for example <code className="rounded bg-white/10 px-1.5 py-0.5">openai/gpt-4.1-mini</code>), then redeploy.</>
+      )
     ) : (
       <>A little stardust got tangled. Try gathering this world again.</>
     )
@@ -896,7 +916,7 @@ function CapsuleProblem({ status, onRetry }: { status: CapsuleStatus; onRetry: (
         A knot in the stardust.
       </h1>
       <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-amber-50/80">{message}</p>
-      {(status === 'error' || status === 'rate-limited') && (
+      {(status === 'error' || status === 'rate-limited' || status === 'auth-failed' || status === 'model-unavailable') && (
         <button
           type="button"
           onClick={onRetry}
