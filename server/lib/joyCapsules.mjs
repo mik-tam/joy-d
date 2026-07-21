@@ -32,6 +32,12 @@ function areSafeWorldNames(value) {
   )
 }
 
+function areSafeSprites(value) {
+  return Array.isArray(value) && value.length <= 24 && value.every(
+    (sprite) => typeof sprite === 'string' && sceneSprites.includes(sprite),
+  )
+}
+
 function isCapsule(value) {
   const fields = ['worldName', 'visualDirection', 'story', 'quote', 'soundMood', 'surprise']
   return value && typeof value === 'object' && fields.every(
@@ -302,8 +308,8 @@ function artDirectionFor(signature, worldDepth) {
 // Returns { status, body } — never throws — so both the Express route and the
 // Vercel function can respond identically with `response.status(status).json(body)`.
 export async function handleJoyCapsuleRequest(requestBody) {
-  const { signature, previousWorldNames = [] } = requestBody ?? {}
-  if (!isSafeSignature(signature) || !areSafeWorldNames(previousWorldNames)) {
+  const { signature, previousWorldNames = [], previousSprites = [] } = requestBody ?? {}
+  if (!isSafeSignature(signature) || !areSafeWorldNames(previousWorldNames) || !areSafeSprites(previousSprites)) {
     return { status: 400, body: { code: 'INVALID_SIGNATURE' } }
   }
 
@@ -376,7 +382,14 @@ export async function handleJoyCapsuleRequest(requestBody) {
     const previousWorldInstruction = previousWorldNames.length
       ? ` It must feel distinctly new and must not reuse these earlier world names: ${JSON.stringify(previousWorldNames)}.`
       : ''
-    const userPrompt = `Create one fresh joy capsule using this creative signature: ${JSON.stringify(signature)}. ${depthBrief}${previousWorldInstruction}`
+    // Without this, journeys tend to converge on the same 1-2 sprite
+    // subjects (a lantern-boat and a crescent-moon) door after door, even
+    // though each world's story and palette differ — the sprite enum is a
+    // small, tempting default to repeat unless explicitly told not to.
+    const previousSpriteInstruction = previousSprites.length
+      ? ` Earlier doors in this same journey already cast these sprite stand-ins: ${JSON.stringify(previousSprites)}. Cast a genuinely different set of subjects and sprite choices this time — do not just repeat the same 1-2 sprites again with a new color.`
+      : ''
+    const userPrompt = `Create one fresh joy capsule using this creative signature: ${JSON.stringify(signature)}. ${depthBrief}${previousWorldInstruction}${previousSpriteInstruction}`
     const openRouterClient = useOpenRouter
       ? new OpenAI({
           apiKey: process.env.OPENROUTER_API_KEY,

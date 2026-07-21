@@ -118,7 +118,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
       // This stays a coarse, non-identifying percentage in the browser-to-
       // server payload; frames and landmarks never leave the device.
       const unlockPulse = Math.round(Math.min(Math.max(smileScoreRef.current, 0), 1) * 100)
-      const nextCapsule = await generateJoyCapsule(signature, capsules.map(({ worldName }) => worldName), unlockPulse)
+      // Nudge the model away from repeating the same 1-2 sprite subjects
+      // every door (a real pattern: several journeys ended up with every
+      // world casting the same lantern-boat + crescent-moon combo).
+      const previousSprites = capsules.flatMap((capsule) => resolveScene(capsule).elements.map((element) => element.sprite))
+      const nextCapsule = await generateJoyCapsule(signature, capsules.map(({ worldName }) => worldName), unlockPulse, previousSprites)
       setCapsules((current) => [...current, nextCapsule])
       setActiveCapsuleIndex(capsules.length)
     } catch (error) {
@@ -358,7 +362,14 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             className="pointer-events-none absolute inset-0 grid place-items-center"
             aria-hidden="true"
           >
-            <PortalRing smileScore={smileScore} />
+            {/* The ring's true size (27-30rem) overflows a phone viewport
+                width, and framer-motion's own scale animation above already
+                claims the transform on this element — so the responsive
+                shrink lives on this separate inner wrapper instead of
+                fighting for the same style property. */}
+            <div className="scale-[0.72] sm:scale-100">
+              <PortalRing smileScore={smileScore} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -572,7 +583,7 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
         type="button"
         onClick={onClose}
         aria-label="Return to my smile"
-        className="absolute left-3 top-3 z-20 inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:left-5 sm:top-5 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
+        className="absolute left-3 top-3 z-20 inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white active:scale-90 active:bg-white/20 active:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:left-5 sm:top-5 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
       >
         <ArrowLeft className="size-4" aria-hidden="true" />
         <span className="hidden sm:inline">Return to my smile</span>
@@ -584,7 +595,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
           onClick={toggleChimes}
           aria-pressed={chimesOn}
           aria-label={chimesOn ? 'World sound on' : 'World sound off'}
-          className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
+          className={`inline-flex size-10 items-center justify-center rounded-full border backdrop-blur transition active:scale-90 focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold ${
+            chimesOn
+              ? 'border-amber-100/50 bg-amber-100/20 text-amber-50 hover:bg-amber-100/30'
+              : 'border-white/15 bg-[#160a31]/60 text-white/70 hover:bg-white/10 hover:text-white'
+          }`}
         >
           {chimesOn ? <Volume2 className="size-4" aria-hidden="true" /> : <VolumeX className="size-4" aria-hidden="true" />}
           <span className="hidden sm:inline">World sound: {chimesOn ? 'On' : 'Off'}</span>
@@ -595,7 +610,11 @@ export function PortalReveal({ onClose, signature, smileScore, smileStatus, wowS
             onClick={() => (isReading ? stopReading() : readCapsuleAloud(activeCapsule))}
             aria-label={isLoadingVoice ? 'Loading the reading' : isReading ? 'Stop the reading' : 'Hear this world'}
             aria-pressed={isReading}
-            className="inline-flex size-10 items-center justify-center rounded-full border border-white/15 bg-[#160a31]/60 text-white/70 backdrop-blur transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold"
+            className={`inline-flex size-10 items-center justify-center rounded-full border backdrop-blur transition active:scale-90 focus:outline-none focus:ring-2 focus:ring-white/40 sm:size-auto sm:gap-2 sm:px-3 sm:py-2 sm:text-xs sm:font-semibold ${
+              isReading || isLoadingVoice
+                ? 'border-amber-100/50 bg-amber-100/20 text-amber-50 hover:bg-amber-100/30'
+                : 'border-white/15 bg-[#160a31]/60 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
           >
             {isLoadingVoice ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />

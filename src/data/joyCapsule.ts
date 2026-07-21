@@ -66,6 +66,7 @@ export async function generateJoyCapsule(
   signature: JoySignature,
   previousWorldNames: string[] = [],
   unlockPulse = signature.signalPercent,
+  previousSprites: string[] = [],
 ): Promise<JoyCapsule> {
   let response: Response
 
@@ -83,6 +84,7 @@ export async function generateJoyCapsule(
           wonderTitle: signature.wonderTitle,
         },
         previousWorldNames,
+        previousSprites,
       }),
     })
   } catch {
