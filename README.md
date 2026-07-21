@@ -23,7 +23,7 @@ A few decisions I made with Codex along the way:
 - Free-model generation had to survive slow responses, duplicate dev requests, and Markdown-wrapped JSON. So it does.
 - Matching is an explicit opt-in to a seven-day anonymous pool. It never uses identity or camera data, and never pretends a demo traveler is a real person.
 
-**Runtime note:** JOY:D runs on any OpenAI-compatible runtime. OpenAI config defaults to `gpt-5.6`; OpenRouter is an optional local demo fallback. The project itself was built with Codex using GPT-5.6.
+**Runtime note:** JOY:D runs on any OpenAI-compatible runtime. Stories default to OpenRouter's free tier, with direct OpenAI (`gpt-5.6`) as an automatic fallback when the free tier is slow; either provider can be pinned. The project itself was built with Codex using GPT-5.6.
 
 ## The experience
 
@@ -42,7 +42,7 @@ A few decisions I made with Codex along the way:
 - OpenAI-compatible API calls through OpenRouter or OpenAI for Joy Capsule generation
 - AI scene casting: the model writes a vivid visual description for every element of its own story (a miniature boat, travelers stepping off clouds) plus a backdrop line, with escalating whimsy briefs per depth and a deterministic fallback scene when a model cannot hold the schema
 - Live world painting: every world's visuals generate in real time, with image prompts following an explicit per-world art direction rather than a single default visual style. Images route through OpenRouter's image API (`OPENROUTER_IMAGE_MODEL`, default `openai/gpt-image-1-mini`) when an OpenRouter key is present, or straight through OpenAI's `gpt-image-1` otherwise. `JOYD_IMAGE_PROVIDER` pins the choice. Worlds open instantly on the painted stage kit; the generated art blooms in as it arrives. Without image credit, the kit is still the complete experience
-- Express for local dev/preview and any persistent-Node host; the same three route handlers also run as Vercel serverless functions for a Vercel deployment (see Deploy below)
+- Express for local dev/preview and any persistent-Node host; the same four route handlers also run as Vercel serverless functions for a Vercel deployment (see Deploy below)
 - Web Audio API for the world soundscapes (filtered-noise beds, pentatonic music-box plinks, and chimes), on by default with a visible mute
 - "Hear this world" reads the capsule aloud with OpenAI's TTS API (`gpt-4o-mini-tts`, a soft storyteller voice) when `OPENAI_API_KEY` is configured, falling back to the browser's own speech synthesis otherwise. Only the AI-generated story text is sent, same rule as image generation
 - A local-only voyage journal in `localStorage` (never sent anywhere) and a canvas-rendered shareable Joy Story card
@@ -59,6 +59,7 @@ JOY:D is a creative experience. Not an emotion-analysis product. Not biometric i
 
 - Camera frames, video, face landmarks, and raw smile measurements stay in the browser and are never sent to the server.
 - The camera remains active inside the portal so the live smile can light each world and open doors. This is disclosed in the portal UI, processing stays entirely in the browser, and the camera stops when the portal closes.
+- On mobile, a one-tap control switches the camera off at any point (releasing the camera and pausing the local face detection); the live smile resumes when it is turned back on. Tapping always works, so the journey continues either way.
 - World image generation sends only AI-generated story text (element descriptions, backdrop line, and the LOOK direction) to the image API. Never camera frames, face data, or anything typed by the user.
 - The AI generator receives a playful creative signature: a shape, a signal percentage, a three-color trail, and a whimsical title. On deeper discoveries, it also receives earlier world names solely to avoid repeating them.
 - Smile Matching is an explicit opt-in. It receives only shape, signal percentage, color trail, a temporary random session token that prevents matching a browser session with itself, and the names and quotes of the three AI-generated worlds. It never uses a name, account, location, camera frame, or face data.
@@ -71,7 +72,7 @@ No separate sample-data download is required. The repository includes the browse
 ### Prerequisites
 
 - Node.js 20 or newer and npm
-- A modern desktop browser with a working camera
+- A modern browser with a working camera (desktop or mobile)
 - An OpenAI or OpenRouter API key for AI-generated Joy Capsules
 
 ### 1. Install dependencies
@@ -118,7 +119,7 @@ Open the local address shown in the terminal. `npm run dev` starts both the Vite
 
 ## Deploy
 
-The three `/api` routes (`joy-capsules`, `joy-scenes`, `smile-matches`) are implemented once as plain functions in `server/lib/*.mjs` and exposed on two different hosts, so behavior never drifts between them:
+The four `/api` routes (`joy-capsules`, `joy-scenes`, `joy-narration`, `smile-matches`) are implemented once as plain functions in `server/lib/*.mjs` and exposed on two different hosts, so behavior never drifts between them:
 
 - **`server/index.mjs`**: an Express app that serves `dist` and the `/api` routes from one long-running process. Use this for local dev/preview and for any host that runs a persistent Node process (Render, Railway, Fly.io, a VPS, etc).
 - **`api/*.js`**: the same routes as Vercel serverless functions, for deploying straight to Vercel.
