@@ -85,7 +85,7 @@ Copy `.env.example` to `.env`, then add **one** provider key. OpenRouter takes p
 
 ```bash
 OPENROUTER_API_KEY=your_key_here
-OPENROUTER_MODEL=openrouter/free
+OPENROUTER_MODEL=openai/gpt-4.1-mini
 OPENROUTER_SITE_URL=http://localhost:5173
 ```
 
@@ -122,7 +122,7 @@ No camera frames, face landmarks, or raw smile measurements are sent to the serv
 ### Option A: Vercel
 
 1. Import the repo in Vercel. The **Vite** framework preset is fine. Vercel auto-detects the `api/` folder and turns it into serverless functions regardless of preset.
-2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `openrouter/free`), `OPENROUTER_IMAGE_MODEL` (default `openai/gpt-image-1-mini`), `OPENROUTER_SITE_URL` (your deployed URL, used as the OpenRouter referer header), `JOYD_WORLD_IMAGES=on`. Or use `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_IMAGE_MODEL` instead if you'd rather run on OpenAI directly (`JOYD_TEXT_PROVIDER` / `JOYD_IMAGE_PROVIDER` can pin one or the other independently).
+2. Set environment variables (Production and Preview): `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `openai/gpt-4.1-mini`), `OPENROUTER_IMAGE_MODEL` (default `openai/gpt-image-1-mini`), `OPENROUTER_SITE_URL` (your deployed URL, used as the OpenRouter referer header), `JOYD_WORLD_IMAGES=on`. Or use `OPENAI_API_KEY` / `OPENAI_MODEL` / `OPENAI_IMAGE_MODEL` instead if you'd rather run on OpenAI directly (`JOYD_TEXT_PROVIDER` / `JOYD_IMAGE_PROVIDER` can pin one or the other independently).
 3. For real anonymous matching, run the Supabase migration and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
 4. Deploy. No `vercel.json` is needed.
 
