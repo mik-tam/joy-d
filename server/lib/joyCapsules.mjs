@@ -349,7 +349,7 @@ export async function handleJoyCapsuleRequest(requestBody) {
       try {
         return useOpenRouter
           ? await client.chat.completions.create({
-              model: process.env.OPENROUTER_MODEL || 'openrouter/free',
+              model: process.env.OPENROUTER_MODEL || 'openai/gpt-4.1-mini',
               messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
